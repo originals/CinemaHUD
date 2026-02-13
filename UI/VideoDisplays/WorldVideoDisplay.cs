@@ -286,24 +286,79 @@ namespace CinemaModule.UI.Displays
         {
             float screenWidth = GameService.Graphics.SpriteScreen.Width;
             float screenHeight = GameService.Graphics.SpriteScreen.Height;
+
+            // Validate corners are not NaN/Infinity
+            for (int i = 0; i < 4; i++)
+            {
+                float cornerX = _screenCorners[i].X;
+                float cornerY = _screenCorners[i].Y;
+
+                if (float.IsNaN(cornerX) || float.IsNaN(cornerY) ||
+                    float.IsInfinity(cornerX) || float.IsInfinity(cornerY))
+                {
+                    width = height = minX = minY = 0;
+                    return;
+                }
+            }
+
+            // Check if any corner is behind the camera 
+            const float BehindCameraThreshold = -5000f;
+            for (int i = 0; i < 4; i++)
+            {
+                if (_screenCorners[i].X < BehindCameraThreshold || _screenCorners[i].Y < BehindCameraThreshold)
+                {
+                    width = height = minX = minY = 0;
+                    return;
+                }
+            }
+
+            //  reject if area is too small or negative
+            float area = CalculateQuadArea(_screenCorners);
+            const float MinAreaThreshold = 10f;
+            if (Math.Abs(area) < MinAreaThreshold)
+            {
+                width = height = minX = minY = 0;
+                return;
+            }
+
+            // Calculate AABB
             float minXf = float.MaxValue, minYf = float.MaxValue;
             float maxXf = float.MinValue, maxYf = float.MinValue;
 
             for (int i = 0; i < 4; i++)
             {
-                float cx = MathHelper.Clamp(_screenCorners[i].X, -screenWidth * 0.5f, screenWidth * 1.5f);
-                float cy = MathHelper.Clamp(_screenCorners[i].Y, -screenHeight * 0.5f, screenHeight * 1.5f);
+                float cornerX = _screenCorners[i].X;
+                float cornerY = _screenCorners[i].Y;
 
-                if (cx < minXf) minXf = cx;
-                if (cy < minYf) minYf = cy;
-                if (cx > maxXf) maxXf = cx;
-                if (cy > maxYf) maxYf = cy;
+                if (cornerX < minXf) minXf = cornerX;
+                if (cornerY < minYf) minYf = cornerY;
+                if (cornerX > maxXf) maxXf = cornerX;
+                if (cornerY > maxYf) maxYf = cornerY;
             }
 
             width = (int)(maxXf - minXf);
             height = (int)(maxYf - minYf);
             minX = (int)minXf;
             minY = (int)minYf;
+
+            // Final bounds check
+            if (width > screenWidth * 1.5f || height > screenHeight * 1.5f)
+            {
+                width = height = minX = minY = 0;
+            }
+        }
+
+        private static float CalculateQuadArea(Vector2[] corners)
+        {
+            // Shoelace formula
+            float area = 0f;
+            for (int i = 0; i < 4; i++)
+            {
+                int j = (i + 1) % 4;
+                area += corners[i].X * corners[j].Y;
+                area -= corners[j].X * corners[i].Y;
+            }
+            return area * 0.5f;
         }
 
         private void SetInRange(bool inRange)
@@ -360,7 +415,10 @@ namespace CinemaModule.UI.Displays
             var videoBounds = new Rectangle(Location.X, Location.Y, Size.X, Size.Y);
             var mousePos = GameService.Input.Mouse.Position;
             bool isHoveringVideo = videoBounds.Contains(mousePos);
-            bool isHoveringPanel = _controlPanel.AbsoluteBounds.Contains(mousePos);
+
+            // Only check panel hover if it has a valid position (not at origin from reset)
+            bool isHoveringPanel = _controlPanel.Location != Point.Zero && 
+                                   _controlPanel.AbsoluteBounds.Contains(mousePos);
             bool isTrackBarDragging = _controlPanel.IsTrackBarDragging;
 
             if (isHoveringVideo || isHoveringPanel || isTrackBarDragging)
