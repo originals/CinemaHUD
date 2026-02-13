@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+<PropertyGroup>
+  <TargetFramework>net48</TargetFramework>
+  <UseWindowsForms>true</UseWindowsForms>
+</PropertyGroup>
+
+  <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BlishHUD" Version="1.2.0" ExcludeAssets="runtime;contentFiles;analyzers" />
+    <PackageReference Include="System.ComponentModel.Composition" Version="6.0.0" />
+    <PackageReference Include="LibVLCSharp" Version="3.9.5" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
+  </ItemGroup>
+
+  <Target Name="RemoveX86LibVLC" AfterTargets="Build">
+    <RemoveDir Directories="$(OutDir)libvlc\win-x86" />
+  </Target>
+
+  <!-- Copy libvlc (only x64) to ref folder for .bhm packaging -->
+  <Target Name="CopyLibVlcToRef" AfterTargets="RemoveX86LibVLC">
+    <ItemGroup>
+      <LibVlcFiles Include="$(OutDir)libvlc\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibVlcFiles)" DestinationFiles="@(LibVlcFiles->'$(ProjectDir)ref\libvlc\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <RemoveDir Directories="$(OutDir)libvlc" />
+  </Target>
+
+</Project>

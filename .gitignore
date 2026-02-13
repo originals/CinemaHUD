@@ -1,0 +1,43 @@
+# Build results
+bin/
+obj/
+Properties/
+*.suo
+*.user
+*.sln.docstates
+*.sln.cache
+
+# Visual Studio files
+.vs/
+*.vsidx
+*.lock
+*.ide
+*.ide-shm
+*.ide-wal
+
+# GitHub specific files
+.github/
+
+# User-specific files
+*.userprefs
+.DS_Store
+Thumbs.db
+
+# NuGet packages
+packages/
+*.nupkg
+
+# Output files
+*.dll
+*.exe
+*.pdb
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# LibVLC extracted files
+ref/libvlc

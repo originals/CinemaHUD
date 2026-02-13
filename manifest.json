@@ -1,0 +1,23 @@
+{
+  "name": "CinemaHUD",
+  "version": "1.0.0",
+  "namespace": "Originals.GW2.CinnemaHUD",
+  "package": "CinemaHUD.dll",
+  "manifest_version": 1,
+
+  "description": "Watch Twitch streams or play custom video's in game world or directly on screen.",
+  "dependencies": {
+    "bh.blishhud": ">=1.2.0"
+  },
+  "url": "",
+  "contributors": [
+    {
+        "name":     "Ori",
+        "username": "Originals.8492",
+        "url":      "https://www.gw2opus.com/user/ori/"
+    }
+  ],
+  "directories": [ "libvlc" ],
+  "enabled_without_gw2": false
+
+}
