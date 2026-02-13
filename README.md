@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  Display content on your screen or place video screens in the game world.<br>
+  Display it on your screen or place video screens in the game world.<br>
   The perfect way to throw an ingame watch party with your guildmates or friends.
 </p>
 
@@ -41,7 +41,7 @@
 
 ### On-Screen Display
 
-A floating video window that stays on top of the game. Drag to reposition and resize to your preference. Perfect for keeping an eye on streams while playing.
+A floating video window that stays on top of the game. Drag to reposition and resize to your preference.
 
 <p align="left">
   <img height="400" alt="On-Screen Display Example" src="https://www.gw2opus.com/wp-content/uploads/2026/02/overlay-example.png" />
@@ -51,7 +51,7 @@ A floating video window that stays on top of the game. Drag to reposition and re
 
 ### ingame World Display
 
-Place a virtual screen at any location in the game world. The screen renders in 3D space and responds to your camera position. Great for creating immersive viewing setups.
+Place a virtual screen at any location in the game world. The screen renders in 3D and responds to your camera position.
 
 <p align="left">
   <img height="400" alt="ingame World Display Example" src="https://www.gw2opus.com/wp-content/uploads/2026/02/ingame-example.png" />
