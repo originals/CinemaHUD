@@ -250,7 +250,6 @@ namespace CinemaModule.UI.Controls
             Opacity = 0f;
             Visible = false;
             Location = Point.Zero;
-            Size = Point.Zero;
 
             // Clear hover states to prevent stale UI
             _isHoveringPlayPause = false;

@@ -1,6 +1,6 @@
 {
   "name": "CinemaHUD",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "namespace": "Originals.GW2.CinnemaHUD",
   "package": "CinemaHUD.dll",
   "manifest_version": 1,
