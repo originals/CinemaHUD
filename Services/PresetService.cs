@@ -13,7 +13,7 @@ namespace CinemaModule.Services
     public class PresetService : IDisposable
     {
         private static readonly Logger Logger = Logger.GetLogger<PresetService>();
-        private const string DefaultApiBaseUrl = "http://www.test.com/wp-json/cinemahud/v2";
+        private const string DefaultApiBaseUrl = "https://www.gw2opus.com/wp-json/cinemahud/v2";
         private const string ImageCacheSubfolder = "presets";
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
