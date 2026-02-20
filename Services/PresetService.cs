@@ -40,7 +40,23 @@ namespace CinemaModule.Services
 
         public bool IsLoaded => _isLoaded;
 
+        public ChannelData FindChannelById(string channelId)
+        {
+            if (string.IsNullOrEmpty(channelId) || _cachedPresets?.StreamCategories == null)
+                return null;
+
+            foreach (var category in _cachedPresets.StreamCategories)
+            {
+                var channel = category.Channels.FirstOrDefault(c => c.Id == channelId);
+                if (channel != null)
+                    return channel;
+            }
+
+            return null;
+        }
+
         public event EventHandler PresetsLoaded;
+        public event EventHandler PresetImagesLoaded;
 
 
         public PresetService(string cacheDirectory) : this(cacheDirectory, DefaultApiBaseUrl)
@@ -121,6 +137,7 @@ namespace CinemaModule.Services
             }
 
             await Task.WhenAll(tasks);
+            PresetImagesLoaded?.Invoke(this, EventArgs.Empty);
         }
 
         private async Task LoadImagesForWorldLocationAsync(WorldLocationPresetData preset)

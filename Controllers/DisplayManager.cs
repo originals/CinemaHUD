@@ -193,7 +193,7 @@ namespace CinemaModule.Controllers
             if (display == null || _videoPlayer == null) 
                 return;
 
-            display.IsPaused = _videoPlayer.IsPaused;
+            display.IsPaused = _videoPlayer.IsPaused || _videoPlayer.IsEnded;
             display.Volume = _videoPlayer.Volume;
         }
 

@@ -97,6 +97,7 @@ namespace CinemaModule.Services
         public AsyncTexture2D GetSetScreenIcon() => AsyncTexture2D.FromAssetId(528726);
         public AsyncTexture2D GetWaypointIcon() => AsyncTexture2D.FromAssetId(156628);
         public AsyncTexture2D GetInfoIcon() => AsyncTexture2D.FromAssetId(1508665);
+        public AsyncTexture2D GetRefreshIcon() => AsyncTexture2D.FromAssetId(156749);
 
         #endregion
 

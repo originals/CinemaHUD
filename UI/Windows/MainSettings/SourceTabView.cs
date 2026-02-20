@@ -117,6 +117,17 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 CanScroll = true
             };
 
+            var refreshButton = new Image
+            {
+                Texture = CinemaModule.CinemaModule.Instance.TextureService.GetRefreshIcon(),
+                Size = new Point(24, 24),
+                Location = new Point(23 + MenuPanelWidth - 34, 16),
+                BasicTooltipText = "Refresh",
+                Opacity = 0.6f,
+                Parent = parent
+            };
+            refreshButton.Click += async (s, e) => await RefreshAllAsync();
+
             _categoryMenu = new Menu
             {
                 Size = menuPanel.ContentRegion.Size,
@@ -125,7 +136,15 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 CanSelect = true
             };
 
+            PopulateCategoryMenu();
+            _categoryMenu.ItemSelected += OnCategorySelected;
+        }
+
+        private void PopulateCategoryMenu()
+        {
+            _categoryMenu.ClearChildren();
             _categoryLookup.Clear();
+
             foreach (var category in _presetService.StreamCategories)
             {
                 var menuItem = _categoryMenu.AddMenuItem(category.Name);
@@ -138,8 +157,6 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             var myStreamsItem = _categoryMenu.AddMenuItem(CategoryMyStreams);
             myStreamsItem.Icon = CinemaModule.CinemaModule.Instance.TextureService.GetEmblem();
-
-            _categoryMenu.ItemSelected += OnCategorySelected;
         }
 
         private void BuildContentPanel(Container parent)
@@ -191,6 +208,27 @@ namespace CinemaHUD.UI.Windows.MainSettings
             }
         }
 
+        private async Task RefreshAllAsync()
+        {
+            await _presetService.LoadPresetsAsync();
+            PopulateCategoryMenu();
+            ReselectCurrentCategory();
+            RefreshContent();
+        }
+
+        private void ReselectCurrentCategory()
+        {
+            if (string.IsNullOrEmpty(_selectedCategoryId))
+                return;
+
+            var menuItem = _categoryMenu.Children
+                .OfType<MenuItem>()
+                .FirstOrDefault(m => m.Text == _selectedCategoryId);
+
+            if (menuItem != null)
+                _categoryMenu.Select(menuItem);
+        }
+
         private void RefreshContent()
         {
             _contentCts?.Cancel();
@@ -202,8 +240,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 LoadFollowedContentAsync(_contentCts.Token);
             else if (_selectedCategoryId == CategoryMyStreams)
                 LoadCustomContent();
-            else if (_categoryLookup.TryGetValue(_selectedCategoryId, out var category))
-                LoadCategoryContentAsync(category, _contentCts.Token);
+            else
+            {
+                var category = _presetService.StreamCategories
+                    .FirstOrDefault(c => c.Name == _selectedCategoryId);
+                if (category != null)
+                    LoadCategoryContentAsync(category, _contentCts.Token);
+            }
         }
 
         private async void LoadFollowedContentAsync(CancellationToken token)
@@ -273,7 +316,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             ReplaceSpinnerWithContent();
             BuildCategoryHeader(category);
 
-            foreach (var item in items.OrderByDescending(i => i.IsOnline))
+            foreach (var item in items.OrderByDescending(i => i.IsOnline).ThenByDescending(i => i.ViewerCount))
             {
                 if (token.IsCancellationRequested) return;
                 _cardFactory.CreateTwitchCard(_contentPanel, item, SelectTwitchChannel);
@@ -298,8 +341,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             ReplaceSpinnerWithContent();
             BuildCategoryHeader(category);
 
-            var livestreams = items.Where(i => !i.IsOnDemand).OrderByDescending(i => i.IsOnline).ToList();
-            var onDemand = items.Where(i => i.IsOnDemand).OrderByDescending(i => i.IsOnline).ToList();
+            var livestreams = items.Where(i => !i.IsOnDemand).OrderByDescending(i => i.IsOnline).ThenBy(i => i.Index).ToList();
+            var onDemand = items.Where(i => i.IsOnDemand).OrderBy(i => i.Index).ToList();
             bool hasBothSections = livestreams.Count > 0 && onDemand.Count > 0;
 
             if (hasBothSections) BuildSectionHeader("Livestreams");
@@ -355,25 +398,27 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private List<StreamListItem> BuildTwitchItems(StreamCategory category)
         {
-            return category.TwitchChannelNames.Select(channelName => new StreamListItem
+            return category.TwitchChannelNames.Select((channelName, index) => new StreamListItem
             {
                 Key = GetPresetTwitchKey(channelName),
                 Title = channelName,
                 TwitchChannel = channelName,
-                AvatarTexture = CinemaModule.CinemaModule.Instance.TextureService.GetDefaultAvatar()
+                AvatarTexture = CinemaModule.CinemaModule.Instance.TextureService.GetDefaultAvatar(),
+                Index = index
             }).ToList();
         }
 
         private List<StreamListItem> BuildChannelItems(StreamCategory category)
         {
-            return category.Channels.Select(channel => new StreamListItem
+            return category.Channels.Select((channel, index) => new StreamListItem
             {
                 Key = GetChannelKey(channel.Id),
                 Title = channel.Title,
                 Subtitle = string.IsNullOrEmpty(channel.Url) ? "No URL configured" : null,
                 ChannelData = channel,
                 AvatarTexture = channel.AvatarTexture ?? CinemaModule.CinemaModule.Instance.TextureService.GetDefaultAvatar(),
-                IsOnDemand = channel.IsOnDemand
+                IsOnDemand = channel.IsOnDemand,
+                Index = index
             }).ToList();
         }
 
@@ -617,6 +662,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
                     _selectedStreamKey = $"{KeyPrefixFollowed}{channelName}";
                 else
                     _selectedStreamKey = GetPresetTwitchKey(channelName);
+                return;
+            }
+
+            if (_settings.CurrentStreamSourceType == StreamSourceType.Url &&
+                !string.IsNullOrEmpty(_settings.SelectedUrlChannelId))
+            {
+                _selectedStreamKey = GetChannelKey(_settings.SelectedUrlChannelId);
             }
         }
 

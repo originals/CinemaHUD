@@ -358,7 +358,7 @@ namespace CinemaModule.UI.Controls
                 return;
             }
 
-            if (_base.SeekBar.AbsoluteBounds.Contains(e.MousePosition))
+            if (ShowSeekBar && _base.SeekBar.AbsoluteBounds.Contains(e.MousePosition))
             {
                 return;
             }

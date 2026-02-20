@@ -153,6 +153,12 @@ namespace CinemaModule.Settings
             set => SetProperty(_data.SelectedSavedStreamId, value, v => _data.SelectedSavedStreamId = v);
         }
 
+        public string SelectedUrlChannelId
+        {
+            get => _data.SelectedUrlChannelId;
+            set => SetProperty(_data.SelectedUrlChannelId, value, v => _data.SelectedUrlChannelId = v);
+        }
+
         public string TwitchAccessToken
         {
             get => _data.TwitchAccessToken;
@@ -288,6 +294,7 @@ namespace CinemaModule.Settings
         {
             SelectedSavedStreamId = "";
             CurrentTwitchChannel = "";
+            SelectedUrlChannelId = channel.Id;
             CurrentStreamSourceType = StreamSourceType.Url;
             CurrentStreamPreset = channel.IsRadio ? channel.ToStreamPresetData() : null;
             StreamUrl = channel.Url;
@@ -410,6 +417,7 @@ namespace CinemaModule.Settings
         public string SelectedPresetLocationId { get; set; } = "";
         public string SelectedSavedLocationId { get; set; } = "";
         public string SelectedSavedStreamId { get; set; } = "";
+        public string SelectedUrlChannelId { get; set; } = "";
         public WorldPosition3D WorldPosition { get; set; } = new WorldPosition3D(0, 0, 0, 0);
         public float WorldScreenWidth { get; set; } = 10f;
         public Point WindowPosition { get; set; } = new Point(100, 50);

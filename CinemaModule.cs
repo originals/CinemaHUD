@@ -123,6 +123,7 @@ namespace CinemaModule
                 _twitchChatService = new TwitchChatService();
 
                 _presetService = new PresetService(cacheDirectory);
+                _presetService.PresetImagesLoaded += OnPresetImagesLoaded;
                 await _presetService.LoadPresetsAsync();
 
                 _textureService = new TextureService(cacheDirectory);
@@ -198,6 +199,7 @@ namespace CinemaModule
         {
             _twitchAuthService.AuthStatusChanged -= OnTwitchAuthStatusChanged;
             _twitchService.ScopeError -= OnTwitchScopeError;
+            _presetService.PresetImagesLoaded -= OnPresetImagesLoaded;
             _controller.ShowChatRequested -= OnShowChatRequested;
             _controller.ToggleChatRequested -= OnToggleChatRequested;
             _controller.ChatChannelChangeRequested -= OnChatChannelChangeRequested;
@@ -383,6 +385,22 @@ namespace CinemaModule
 
             _windowDisplayPanel.Size = _userSettings.WindowSize;
             _windowDisplayPanel.Location = _userSettings.WindowPosition;
+        }
+
+        private void OnPresetImagesLoaded(object sender, EventArgs e)
+        {
+            if (_userSettings.CurrentStreamSourceType != StreamSourceType.Url)
+                return;
+
+            var channelId = _userSettings.SelectedUrlChannelId;
+            if (string.IsNullOrEmpty(channelId))
+                return;
+
+            var channel = _presetService.FindChannelById(channelId);
+            if (channel?.IsRadio == true)
+            {
+                _userSettings.CurrentStreamPreset = channel.ToStreamPresetData();
+            }
         }
 
         #endregion

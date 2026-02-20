@@ -21,6 +21,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
         public string Subtitle { get; set; }
         public Color SubtitleColor { get; set; } = Color.Gray;
         public string AvatarUrl { get; set; }
+        public int ViewerCount { get; set; }
 
         public static StreamStatus Offline() => new StreamStatus
         {
@@ -47,7 +48,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
         {
             IsOnline = true,
             Subtitle = $"LIVE: {gameName ?? "Streaming"} - {viewerCount:N0} viewers",
-            SubtitleColor = AvailableColor
+            SubtitleColor = AvailableColor,
+            ViewerCount = viewerCount
         };
     }
 
@@ -63,6 +65,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
         public string AvatarUrl { get; set; }
         public bool IsOnline { get; set; }
         public bool IsOnDemand { get; set; }
+        public int ViewerCount { get; set; }
+        public int Index { get; set; }
 
         public void ApplyStatus(StreamStatus status)
         {
@@ -70,6 +74,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             Subtitle = status.Subtitle;
             SubtitleColor = status.SubtitleColor;
             AvatarUrl = string.IsNullOrEmpty(status.AvatarUrl) ? AvatarUrl : status.AvatarUrl;
+            ViewerCount = status.ViewerCount;
         }
     }
 
