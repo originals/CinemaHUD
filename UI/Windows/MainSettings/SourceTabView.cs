@@ -424,6 +424,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildCenteredLoginButton()
         {
+            _contentPanel.ClearChildren();
             var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 200, Parent = _contentPanel };
             var loginButton = new StandardButton
             {

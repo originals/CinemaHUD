@@ -83,6 +83,12 @@ namespace CinemaModule.UI.Chat
             BuildWindowContent();
 
             Resized += OnWindowResized;
+            _authService.AuthStatusChanged += OnAuthStatusChanged;
+        }
+
+        private void OnAuthStatusChanged(object sender, TwitchAuthStatusEventArgs e)
+        {
+            _chatPanel.RefreshAuthStatus();
         }
 
         private void OnWindowResized(object sender, ResizedEventArgs e)
@@ -198,6 +204,7 @@ namespace CinemaModule.UI.Chat
         {
             _chatPanel.MessageSent -= OnChatMessageSent;
             Resized -= OnWindowResized;
+            _authService.AuthStatusChanged -= OnAuthStatusChanged;
             _ = _chatService.DisconnectAsync();
             base.DisposeControl();
         }

@@ -126,6 +126,20 @@ namespace CinemaModule.UI.Chat
 
             Resized += OnResized;
 
+            SyncConnectionStatus();
+            UpdateLoginStatusLabel();
+        }
+
+        private void SyncConnectionStatus()
+        {
+            bool isConnected = _chatService.IsConnected;
+            _statusLabel.Text = isConnected ? "Connected" : "Disconnected";
+            _statusLabel.TextColor = isConnected ? Color.LightGreen : Color.Gray;
+        }
+
+        public void RefreshAuthStatus()
+        {
+            SyncConnectionStatus();
             UpdateLoginStatusLabel();
         }
 
