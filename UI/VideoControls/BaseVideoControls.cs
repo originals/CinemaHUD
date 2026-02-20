@@ -14,6 +14,7 @@ namespace CinemaModule.UI.Controls
         public const int IconSize = 32;
         public const int TrackBarWidth = 100;
         public const int TrackBarHeight = 16;
+        public const int SeekBarHeight = 16;
         public const int ControlSpacing = 8;
         public const int QualityDropdownWidth = 140;
         public const float FadeDuration = 0.2f;
@@ -24,14 +25,17 @@ namespace CinemaModule.UI.Controls
 
         public VideoControlsRenderer Renderer { get; }
         public TrackBar VolumeTrackBar { get; }
+        public TrackBar SeekBar { get; }
         public Dropdown QualityDropdown { get; }
 
-        protected bool IsHoveringPlayPause;
-        protected bool IsHoveringVolume;
-        protected bool IsHoveringSettings;
         protected int LastVolume = 100;
-
         protected Tween FadeAnimation;
+
+        private bool _wasSeekBarDragging;
+        private float _currentPosition;
+        private long _duration;
+        private float _pendingSeekPosition = -1f;
+        private const float SeekPositionTolerance = 0.02f;
 
         #endregion
 
@@ -41,6 +45,7 @@ namespace CinemaModule.UI.Controls
         public event EventHandler<int> VolumeChanged;
         public event EventHandler SettingsClicked;
         public event EventHandler<int> QualityChanged;
+        public event EventHandler<float> SeekRequested;
 
         #endregion
 
@@ -69,9 +74,49 @@ namespace CinemaModule.UI.Controls
             set => _opacity = value;
         }
 
+        public bool IsSeekBarDragging => SeekBar?.Dragging ?? false;
+
+        private bool IsSeekPending => _pendingSeekPosition >= 0f;
+
+        private bool JustStoppedDragging => _wasSeekBarDragging && !IsSeekBarDragging;
+
+        public float CurrentPosition
+        {
+            get => _currentPosition;
+            set
+            {
+                if (SeekBar == null) return;
+
+                if (IsSeekBarDragging) return;
+
+                if (JustStoppedDragging) return;
+
+                if (IsSeekPending)
+                {
+                    if (Math.Abs(value - _pendingSeekPosition) < SeekPositionTolerance)
+                    {
+                        _pendingSeekPosition = -1f;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                _currentPosition = value;
+                SeekBar.Value = value * 100f;
+            }
+        }
+
+        public long Duration
+        {
+            get => _duration;
+            set => _duration = value;
+        }
+
         #endregion
 
-        public BaseVideoControls(Container parent, int trackBarWidth, int trackBarHeight, int dropdownWidth)
+        public BaseVideoControls(Container parent, int trackBarWidth, int trackBarHeight, int dropdownWidth, bool createSeekBar = false)
         {
             Renderer = new VideoControlsRenderer(CinemaModule.Instance.TextureService);
 
@@ -80,6 +125,12 @@ namespace CinemaModule.UI.Controls
 
             QualityDropdown = CreateQualityDropdown(parent, dropdownWidth);
             QualityDropdown.ValueChanged += OnQualityDropdownChanged;
+
+            if (createSeekBar)
+            {
+                SeekBar = CreateSeekBar(parent);
+                SeekBar.ValueChanged += OnSeekBarValueChanged;
+            }
         }
 
         #region Private Methods
@@ -107,9 +158,60 @@ namespace CinemaModule.UI.Controls
             };
         }
 
+        private TrackBar CreateSeekBar(Container parent)
+        {
+            return new TrackBar
+            {
+                Parent = parent,
+                MinValue = 0,
+                MaxValue = 100,
+                Value = 0,
+                SmallStep = false,
+                Size = new Point(200, SeekBarHeight),
+                Visible = false
+            };
+        }
+
+        private void OnSeekBarValueChanged(object sender, ValueEventArgs<float> e)
+        {
+            if (SeekBar.Dragging)
+            {
+                _currentPosition = e.Value / 100f;
+            }
+        }
+
+        public void UpdateSeekBarDragState()
+        {
+            if (SeekBar == null) return;
+
+            if (_wasSeekBarDragging && !SeekBar.Dragging)
+            {
+                float seekPosition = SeekBar.Value / 100f;
+                _pendingSeekPosition = seekPosition;
+                _currentPosition = seekPosition;
+                SeekRequested?.Invoke(this, seekPosition);
+            }
+
+            _wasSeekBarDragging = SeekBar.Dragging;
+        }
+
+        public string FormatTimeDisplay()
+        {
+            var currentTime = TimeSpan.FromMilliseconds(_duration * _currentPosition);
+            var totalTime = TimeSpan.FromMilliseconds(_duration);
+            return $"{FormatTime(currentTime)} / {FormatTime(totalTime)}";
+        }
+
+        private static string FormatTime(TimeSpan ts)
+        {
+            return ts.Hours > 0
+                ? $"{ts.Hours}:{ts.Minutes:D2}:{ts.Seconds:D2}"
+                : $"{ts.Minutes}:{ts.Seconds:D2}";
+        }
+
         protected virtual void OnVolumePropertyChanged(int newValue)
         {
-            if (VolumeTrackBar != null && !VolumeTrackBar.Dragging)
+            if (!VolumeTrackBar.Dragging)
             {
                 VolumeTrackBar.Value = newValue;
             }
@@ -142,19 +244,13 @@ namespace CinemaModule.UI.Controls
                 _volume = LastVolume > 0 ? LastVolume : 50;
             }
 
-            if (VolumeTrackBar != null)
-            {
-                VolumeTrackBar.Value = _volume;
-            }
+            VolumeTrackBar.Value = _volume;
             RaiseVolumeChanged(_volume);
         }
 
         private void OnQualityDropdownChanged(object sender, ValueChangedEventArgs e)
         {
-            int selectedIndex = QualityDropdown.SelectedItem != null 
-                ? QualityDropdown.Items.IndexOf(QualityDropdown.SelectedItem)
-                : -1;
-            
+            int selectedIndex = QualityDropdown.Items.IndexOf(QualityDropdown.SelectedItem);
             if (selectedIndex >= 0)
             {
                 RaiseQualityChanged(selectedIndex);
@@ -163,8 +259,6 @@ namespace CinemaModule.UI.Controls
 
         public void UpdateAvailableQualities(IReadOnlyList<string> qualityNames, int selectedIndex)
         {
-            if (QualityDropdown == null) return;
-
             QualityDropdown.Items.Clear();
 
             if (qualityNames == null || qualityNames.Count == 0)
@@ -234,22 +328,21 @@ namespace CinemaModule.UI.Controls
         public virtual void Dispose()
         {
             CleanupEventHandlers();
-            VolumeTrackBar?.Dispose();
-            QualityDropdown?.Dispose();
+            VolumeTrackBar.Dispose();
+            SeekBar?.Dispose();
+            QualityDropdown.Dispose();
         }
 
         #endregion
 
         protected virtual void CleanupEventHandlers()
         {
-            if (VolumeTrackBar != null)
-            {
-                VolumeTrackBar.ValueChanged -= OnVolumeTrackBarChanged;
-            }
+            VolumeTrackBar.ValueChanged -= OnVolumeTrackBarChanged;
+            QualityDropdown.ValueChanged -= OnQualityDropdownChanged;
 
-            if (QualityDropdown != null)
+            if (SeekBar != null)
             {
-                QualityDropdown.ValueChanged -= OnQualityDropdownChanged;
+                SeekBar.ValueChanged -= OnSeekBarValueChanged;
             }
         }
     }

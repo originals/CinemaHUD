@@ -1,8 +1,10 @@
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
-using CinemaModule.Services;
+using Blish_HUD.Controls.Effects;
+using Glide;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 
@@ -13,16 +15,23 @@ namespace CinemaHUD.UI.Windows.MainSettings
         public string Text { get; set; }
         public int Width { get; set; } = 50;
         public Action OnClick { get; set; }
+        public AsyncTexture2D Icon { get; set; }
+        public string Tooltip { get; set; }
     }
 
     public class ListCard : Panel
     {
+        private static readonly Logger Logger = Logger.GetLogger<ListCard>();
+        private static readonly AsyncTexture2D _textureMenuItemFade = AsyncTexture2D.FromAssetId(156044);
+
         #region Fields
 
         public const int DefaultCardWidth = 450;
         public const int DefaultCardHeight = 60;
         public const int DefaultTextPanelWidth = 400;
-        private const int ImageSize = 44;
+        private const int ImageMaxHeight = 44;
+        private const int ImageDefaultWidth = 44;
+        private const int ImageMaxWidth = 80;
         private const int ImageLeft = 8;
         private const int ImageTop = 8;
         private const int TextPanelTop = 8;
@@ -33,16 +42,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private const int TitleIconSize = 18;
         private const int TitleIconSpacing = 4;
 
-        public static readonly Color SelectedColor = new Color(60, 90, 60, 200);
-        public static readonly Color DefaultColor = new Color(45, 45, 48, 180);
-
         private readonly Label _titleLabel;
         private readonly Label _subtitleLabel;
         private readonly Image _avatarImage;
         private readonly Image _titleIcon;
         private readonly FlowPanel _textPanel;
         private readonly Panel _titleRow;
-        private readonly List<StandardButton> _buttons = new List<StandardButton>();
+        private readonly List<Control> _buttons = new List<Control>();
+        private readonly ScrollingHighlightEffect _scrollEffect;
         private bool _isSelected;
 
         #endregion
@@ -63,9 +70,9 @@ namespace CinemaHUD.UI.Windows.MainSettings
             set
             {
                 if (_isSelected == value) return;
-                
+
                 _isSelected = value;
-                BackgroundColor = _isSelected ? SelectedColor : DefaultColor;
+                UpdateSelectedState();
             }
         }
 
@@ -81,21 +88,26 @@ namespace CinemaHUD.UI.Windows.MainSettings
             AsyncTexture2D avatarTexture = null,
             AsyncTexture2D iconTexture = null)
         {
-            Width = DefaultCardWidth;
+            WidthSizingMode = SizingMode.Fill;
             Height = DefaultCardHeight;
-            BackgroundColor = isSelected ? SelectedColor : DefaultColor;
-            BackgroundTexture = CinemaModule.CinemaModule.Instance.TextureService.GetCardBackground();
             Parent = parent;
             _isSelected = isSelected;
 
-            int textPanelLeft = ImageLeft + ImageSize + 8;
+            _scrollEffect = new ScrollingHighlightEffect(this)
+            {
+                Size = new Vector2(Width, Height)
+            };
+            EffectBehind = _scrollEffect;
+            UpdateSelectedState();
+
+            int textPanelLeft = ImageLeft + ImageDefaultWidth + 8;
 
             _avatarImage = new Image
             {
-                Size = new Point(ImageSize, ImageSize),
+                Size = new Point(ImageDefaultWidth, ImageMaxHeight),
                 Left = ImageLeft,
                 Top = ImageTop,
-                Texture = avatarTexture ?? ContentService.Textures.TransparentPixel,
+                Texture = ContentService.Textures.TransparentPixel,
                 Parent = this
             };
 
@@ -112,12 +124,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             _titleRow = new Panel
             {
-                HeightSizingMode = SizingMode.AutoSize,
-                WidthSizingMode = SizingMode.AutoSize,
+                Height = 20,
+                WidthSizingMode = SizingMode.Fill,
                 Parent = _textPanel
             };
 
             int titleLeft = 0;
+            int titleMaxWidth = textPanelWidth;
             if (iconTexture != null)
             {
                 _titleIcon = new Image
@@ -129,13 +142,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
                     Parent = _titleRow
                 };
                 titleLeft = TitleIconSize + TitleIconSpacing;
+                titleMaxWidth -= titleLeft;
             }
 
             _titleLabel = new Label
             {
                 Text = title,
-                AutoSizeHeight = true,
-                AutoSizeWidth = true,
+                Height = 20,
+                Width = titleMaxWidth,
                 Left = titleLeft,
                 Font = Blish_HUD.GameService.Content.DefaultFont16,
                 Parent = _titleRow
@@ -144,8 +158,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _subtitleLabel = new Label
             {
                 Text = subtitle,
-                AutoSizeHeight = true,
-                AutoSizeWidth = true,
+                Height = 18,
+                Width = textPanelWidth,
                 TextColor = Color.LightGray,
                 Font = Blish_HUD.GameService.Content.DefaultFont14,
                 Parent = _textPanel
@@ -155,9 +169,66 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             if (buttons != null)
             {
-                AddButtons(buttons, textPanelWidth);
+                CreateButtonControls(buttons);
+            }
+
+            if (avatarTexture != null)
+            {
+                SetAvatar(avatarTexture);
             }
         }
+
+        #region Rendering
+
+        public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
+        {
+            base.PaintBeforeChildren(spriteBatch, bounds);
+
+            if (_textureMenuItemFade.HasTexture && ShouldDrawDarkStripe())
+            {
+                spriteBatch.DrawOnCtrl(this, _textureMenuItemFade, bounds, Color.Black * 0.4f);
+            }
+        }
+
+        private bool ShouldDrawDarkStripe()
+        {
+            if (Parent == null) return false;
+
+            int index = 0;
+            foreach (var child in Parent.Children)
+            {
+                if (child == this) break;
+                if (child is ListCard) index++;
+            }
+
+            return index % 2 == 0;
+        }
+
+        #endregion
+
+        #region Hover Effects
+
+        protected override void OnMouseEntered(Blish_HUD.Input.MouseEventArgs e)
+        {
+            base.OnMouseEntered(e);
+            _scrollEffect.Enable();
+        }
+
+        protected override void OnMouseLeft(Blish_HUD.Input.MouseEventArgs e)
+        {
+            base.OnMouseLeft(e);
+            if (!_isSelected)
+            {
+                _scrollEffect.Disable();
+            }
+        }
+
+        private void UpdateSelectedState()
+        {
+            _scrollEffect.ForceActive = _isSelected;
+        }
+
+        #endregion
 
 
         protected override void OnClick(Blish_HUD.Input.MouseEventArgs e)
@@ -172,30 +243,104 @@ namespace CinemaHUD.UI.Windows.MainSettings
             base.OnClick(e);
         }
 
-        private void AddButtons(IEnumerable<ListCardButton> buttons, int textPanelWidth)
+        private void CreateButtonControls(IEnumerable<ListCardButton> buttonConfigs)
         {
-            int rightPosition = Width - ButtonSpacing - 10;
+            int rightPosition = Width - ButtonSpacing - 15;
 
-            foreach (var buttonConfig in buttons)
+            foreach (var buttonConfig in buttonConfigs)
             {
                 rightPosition -= buttonConfig.Width;
 
-                var button = new StandardButton
-                {
-                    Text = buttonConfig.Text,
-                    Width = buttonConfig.Width,
-                    Height = ButtonHeight,
-                    Left = rightPosition,
-                    Top = ButtonTop,
-                    Parent = this
-                };
+                bool isIconOnly = buttonConfig.Icon != null && string.IsNullOrEmpty(buttonConfig.Text);
 
-                if (buttonConfig.OnClick != null)
+                if (isIconOnly)
                 {
-                    button.Click += (s, e) => buttonConfig.OnClick();
+                    var glowButton = new GlowButton
+                    {
+                        Icon = buttonConfig.Icon,
+                        Size = new Point(buttonConfig.Width, ButtonHeight),
+                        Left = rightPosition,
+                        Top = ButtonTop,
+                        BasicTooltipText = buttonConfig.Tooltip,
+                        Parent = this
+                    };
+
+                    if (buttonConfig.OnClick != null)
+                    {
+                        glowButton.Click += (s, e) => buttonConfig.OnClick();
+                    }
+
+                    _buttons.Add(glowButton);
+                }
+                else
+                {
+                    var button = new StandardButton
+                    {
+                        Text = buttonConfig.Text ?? "",
+                        Width = buttonConfig.Width,
+                        Height = ButtonHeight,
+                        Left = rightPosition,
+                        Top = ButtonTop,
+                        BasicTooltipText = buttonConfig.Tooltip,
+                        Parent = this
+                    };
+
+                    if (buttonConfig.Icon != null)
+                    {
+                        button.Icon = buttonConfig.Icon;
+                    }
+
+                    if (buttonConfig.OnClick != null)
+                    {
+                        button.Click += (s, e) => buttonConfig.OnClick();
+                    }
+
+                    _buttons.Add(button);
                 }
 
-                _buttons.Add(button);
+                rightPosition -= ButtonSpacing;
+            }
+        }
+
+        public override void RecalculateLayout()
+        {
+            base.RecalculateLayout();
+            if (_scrollEffect == null) return;
+            _scrollEffect.Size = new Vector2(Width, Height);
+            UpdateTextPanelWidth();
+            RepositionButtons();
+        }
+
+        private void UpdateTextPanelWidth()
+        {
+            if (_textPanel == null || _titleLabel == null || _subtitleLabel == null) return;
+
+            int totalButtonWidth = 0;
+            foreach (var button in _buttons)
+            {
+                totalButtonWidth += button.Width + ButtonSpacing;
+            }
+
+            int availableWidth = Width - _textPanel.Left - totalButtonWidth - ButtonSpacing - 20;
+            if (availableWidth > 0)
+            {
+                _textPanel.Width = availableWidth;
+                _titleLabel.Width = availableWidth - (_titleLabel.Left > 0 ? _titleLabel.Left : 0);
+                _subtitleLabel.Width = availableWidth;
+                _textPanel.Invalidate();
+            }
+        }
+
+        private void RepositionButtons()
+        {
+            if (_buttons.Count == 0) return;
+
+            var buttonsCopy = new List<Control>(_buttons);
+            int rightPosition = Width - ButtonSpacing - 15;
+            foreach (var button in buttonsCopy)
+            {
+                rightPosition -= button.Width;
+                button.Left = rightPosition;
                 rightPosition -= ButtonSpacing;
             }
         }
@@ -212,10 +357,50 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         public void SetAvatar(AsyncTexture2D texture)
         {
-            if (texture != null)
+            if (texture == null)
+                return;
+
+            _avatarImage.Texture = texture;
+
+            if (texture.Texture != null)
             {
-                _avatarImage.Texture = texture;
+                UpdateAvatarSize(texture.Texture.Width, texture.Texture.Height);
             }
+            else
+            {
+                texture.TextureSwapped += OnAvatarTextureSwapped;
+            }
+        }
+
+        private void OnAvatarTextureSwapped(object sender, ValueChangedEventArgs<Texture2D> e)
+        {
+            if (sender is AsyncTexture2D asyncTexture)
+            {
+                asyncTexture.TextureSwapped -= OnAvatarTextureSwapped;
+            }
+
+            if (e.NewValue != null)
+            {
+                UpdateAvatarSize(e.NewValue.Width, e.NewValue.Height);
+            }
+        }
+
+        private void UpdateAvatarSize(int textureWidth, int textureHeight)
+        {
+            if (textureWidth <= 0 || textureHeight <= 0)
+            {
+                Logger.Warn($"Invalid avatar dimensions: {textureWidth}x{textureHeight}");
+                return;
+            }
+
+            float aspectRatio = (float)textureWidth / textureHeight;
+            int newWidth = (int)(ImageMaxHeight * aspectRatio);
+
+            newWidth = Math.Min(newWidth, ImageMaxWidth);
+            newWidth = Math.Max(newWidth, ImageDefaultWidth);
+
+            _avatarImage.Size = new Point(newWidth, ImageMaxHeight);
+            _textPanel.Left = ImageLeft + newWidth + 8;
         }
 
         private void UpdateTitleCentering()

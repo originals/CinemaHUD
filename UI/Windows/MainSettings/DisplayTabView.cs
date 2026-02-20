@@ -1,17 +1,16 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
+using Blish_HUD.Settings;
 using CinemaHUD.UI.Windows.Info;
 using CinemaModule;
 using CinemaModule.Models;
 using CinemaModule.Services;
 using CinemaModule.Settings;
 using Microsoft.Xna.Framework;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
 using LocationEditorWindow = CinemaHUD.UI.Windows.SettingsSmall.LocationEditorWindow;
 
 namespace CinemaHUD.UI.Windows.MainSettings
@@ -30,16 +29,16 @@ namespace CinemaHUD.UI.Windows.MainSettings
         
         private Checkbox _enabledCheckbox;
         private Dropdown _displayModeDropdown;
-        private FlowPanel _locationSection;
-        private FlowPanel _windowHelpSection;
+        private Panel _locationSection;
+        private Panel _windowHelpSection;
         private FlowPanel _locationsContainer;
         private Dictionary<string, ListCard> _locationCards = new Dictionary<string, ListCard>();
 
         private LocationEditorWindow _editorWindow;
         private LocationInfoWindow _presetInfoWindow;
-
-
         private EventHandler _presetsLoadedHandler;
+        private EventHandler _savedLocationsChangedHandler;
+        private EventHandler<ValueChangedEventArgs<bool>> _enabledSettingChangedHandler;
 
         #endregion
 
@@ -56,41 +55,40 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         protected override void Build(Container buildPanel)
         {
-            var panel = new FlowPanel
+            var displaySettingsPanel = new Panel
             {
-                FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                WidthSizingMode = SizingMode.Fill,
-                HeightSizingMode = SizingMode.Fill,
-                OuterControlPadding = new Vector2(55, 0),
-                ControlPadding = new Vector2(20, 10),
+                ShowBorder = true,
+                Title = "Display Settings",
+                Size = new Point(buildPanel.Width - 70, 120),
+                Location = new Point(23, 10),
                 Parent = buildPanel
             };
 
-            BuildDisplayModeSection(panel);
+            BuildDisplayModeSection(displaySettingsPanel);
 
-            _windowHelpSection = new FlowPanel
+            _windowHelpSection = new Panel
             {
-                FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                WidthSizingMode = SizingMode.Fill,
-                HeightSizingMode = SizingMode.AutoSize,
-                ControlPadding = new Vector2(0, 6),
-                Parent = panel
+                ShowBorder = true,
+                Title = "Window Controls",
+                Size = new Point(buildPanel.Width - 70, 130),
+                Location = new Point(23, 140),
+                Parent = buildPanel
             };
             BuildWindowHelpSection();
 
-            _locationSection = new FlowPanel
+            _locationSection = new Panel
             {
-                FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                WidthSizingMode = SizingMode.Fill,
-                HeightSizingMode = SizingMode.AutoSize,
-                ControlPadding = new Vector2(0, 10),
-                Parent = panel
+                ShowBorder = true,
+                Size = new Point(buildPanel.Width - 70, buildPanel.Height - 280),
+                Location = new Point(23, 140),
+                Parent = buildPanel
             };
 
             BuildLocationSection();
             UpdateVisibility();
 
-            _settings.SavedLocationsChanged += (s, e) => RebuildSavedLocationCards();
+            _savedLocationsChangedHandler = (s, e) => RebuildLocationCards();
+            _settings.SavedLocationsChanged += _savedLocationsChangedHandler;
             _presetsLoadedHandler = (s, e) => RebuildLocationCards();
             _presetService.PresetsLoaded += _presetsLoadedHandler;
         }
@@ -101,37 +99,12 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildDisplayModeSection(Container parent)
         {
-            new Label
-            {
-                Text = "Display Settings",
-                AutoSizeHeight = true,
-                AutoSizeWidth = true,
-                Font = GameService.Content.DefaultFont16,
-                Parent = parent
-            };
-
-            var modePanel = new FlowPanel
-            {
-                FlowDirection = ControlFlowDirection.LeftToRight,
-                WidthSizingMode = SizingMode.Fill,
-                HeightSizingMode = SizingMode.AutoSize,
-                ControlPadding = new Vector2(190, 0),
-                Parent = parent
-            };
-
-            var checkboxWrapper = new Panel
-            {
-                Width = 100,
-                Height = 40,
-                Parent = modePanel
-            };
-
             _enabledCheckbox = new Checkbox
             {
                 Text = "Enabled",
                 Checked = _cinemaSettings.IsEnabled,
-                Top = 4,
-                Parent = checkboxWrapper
+                Location = new Point(10, 15),
+                Parent = parent
             };
 
             _enabledCheckbox.CheckedChanged += (s, e) =>
@@ -140,18 +113,20 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 UpdateVisibility();
             };
 
-            _cinemaSettings.EnabledSetting.SettingChanged += (s, e) =>
+            _enabledSettingChangedHandler = (s, e) =>
             {
                 if (_enabledCheckbox.Checked != e.NewValue)
                 {
                     _enabledCheckbox.Checked = e.NewValue;
                 }
             };
+            _cinemaSettings.EnabledSetting.SettingChanged += _enabledSettingChangedHandler;
 
             _displayModeDropdown = new Dropdown
             {
                 Width = 160,
-                Parent = modePanel
+                Location = new Point(150, 13),
+                Parent = parent
             };
 
             foreach (var mode in Enum.GetValues(typeof(CinemaDisplayMode)))
@@ -170,15 +145,6 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildWindowHelpSection()
         {
-            new Label
-            {
-                Text = "Window Controls",
-                AutoSizeHeight = true,
-                AutoSizeWidth = true,
-                Font = GameService.Content.DefaultFont16,
-                Parent = _windowHelpSection
-            };
-
             var helpText = new Label
             {
                 Text = "• Drag anywhere on the video to move the window\n" +
@@ -186,6 +152,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                        "• Hover over the video to access playback controls",
                 AutoSizeHeight = true,
                 AutoSizeWidth = true,
+                Location = new Point(10, 10),
                 TextColor = Color.LightGray,
                 Parent = _windowHelpSection
             };
@@ -193,46 +160,48 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildLocationSection()
         {
-            var header = new Panel
+            var headerPanel = new Panel
             {
-                WidthSizingMode = SizingMode.Fill,
-                Height = 30,
+                Size = new Point(_locationSection.ContentRegion.Width, 36),
+                Location = new Point(0, 0),
+                BackgroundTexture = CinemaModule.CinemaModule.Instance.TextureService.GetCardBackground(),
                 Parent = _locationSection
             };
 
             new Label
             {
                 Text = "Locations",
-                AutoSizeHeight = true,
+                Font = GameService.Content.DefaultFont18,
                 AutoSizeWidth = true,
-                Font = GameService.Content.DefaultFont16,
-                Top = 4,
-                Parent = header
+                AutoSizeHeight = true,
+                Location = new Point(10, 8),
+                Parent = headerPanel
             };
-
-            var importButton = new StandardButton
-            {
-                Text = "Import",
-                Width = 70,
-                Left = 270,
-                Parent = header
-            };
-            importButton.Click += (s, e) => ImportLocationFromClipboard();
 
             var addButton = new StandardButton
             {
                 Text = "+ Add New",
                 Width = 100,
-                Left = 350,
-                Parent = header
+                Parent = headerPanel
             };
+            addButton.Location = new Point(headerPanel.Width - addButton.Width - 10, 5);
             addButton.Click += (s, e) => OpenEditorForNewLocation();
+
+            var importButton = new GlowButton
+            {
+                Icon = CinemaModule.CinemaModule.Instance.TextureService.GetImportIcon(),
+                Size = new Point(30, 26),
+                BasicTooltipText = "Import from Clipboard",
+                Parent = headerPanel
+            };
+            importButton.Location = new Point(addButton.Location.X - importButton.Width - 5, 7);
+            importButton.Click += (s, e) => ImportLocationFromClipboard();
 
             _locationsContainer = new FlowPanel
             {
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                WidthSizingMode = SizingMode.Fill,
-                Height = 420,
+                Size = new Point(_locationSection.ContentRegion.Width, _locationSection.ContentRegion.Height - 50),
+                Location = new Point(0, 46),
                 ControlPadding = new Vector2(0, 4),
                 CanScroll = true,
                 Parent = _locationSection
@@ -282,7 +251,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             var buttons = new List<ListCardButton>
             {
-                new ListCardButton { Text = "Info", Width = 50, OnClick = () => ShowPresetInfo(preset) }
+                new ListCardButton 
+                { 
+                    Text = "", 
+                    Width = 30, 
+                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetInfoIcon(),
+                    Tooltip = "View Details",
+                    OnClick = () => ShowPresetInfo(preset) 
+                }
             };
 
             var card = new ListCard(
@@ -309,11 +285,6 @@ namespace CinemaHUD.UI.Windows.MainSettings
             }
         }
 
-        private void RebuildSavedLocationCards()
-        {
-            RebuildLocationCards();
-        }
-
         private void CreateSavedLocationListItem(SavedLocation location)
         {
             bool isSelected = _settings.SelectedSavedLocationId == location.Id;
@@ -322,8 +293,23 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             var buttons = new List<ListCardButton>
             {
-                new ListCardButton { Text = "X", Width = 30, OnClick = () => DeleteLocation(location) },
-                new ListCardButton { Text = "Edit", Width = 50, OnClick = () => OpenEditorForLocation(location) }
+                new ListCardButton 
+                { 
+                    Text = "", 
+                    Width = 30, 
+                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetDeleteIcon(),
+                    Tooltip = "Delete",
+                    OnClick = () => DeleteLocation(location) 
+                },
+                new ListCardButton 
+                { 
+                    Text = "", 
+                    Width = 30, 
+                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetExportIcon(),
+                    Tooltip = "Export to Clipboard",
+                    OnClick = () => ExportLocationToClipboard(location) 
+                },
+                new ListCardButton { Text = "Edit", Width = 50, Tooltip = "Edit Location", OnClick = () => OpenEditorForLocation(location) }
             };
 
             var card = new ListCard(
@@ -331,7 +317,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 $"{location.Name ?? "Unnamed"} - Map {mapId}",
                 string.Empty,
                 isSelected,
-                textPanelWidth: 320,
+                textPanelWidth: 260,
                 buttons: buttons);
 
             _locationCards["saved_" + location.Id] = card;
@@ -389,7 +375,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
                 var json = System.Windows.Forms.Clipboard.GetText();
                 var importData = JsonConvert.DeserializeObject<SavedLocationExport>(json);
-                
+
                 if (importData?.Position == null)
                 {
                     Logger.Debug("Invalid location data in clipboard");
@@ -403,6 +389,32 @@ namespace CinemaHUD.UI.Windows.MainSettings
             catch (Exception ex)
             {
                 Logger.Debug($"Failed to import location from clipboard: {ex.Message}");
+            }
+        }
+
+        private void ExportLocationToClipboard(SavedLocation location)
+        {
+            ExportToClipboard(location.Name, location.Position, location.ScreenWidth);
+        }
+
+        private void ExportToClipboard(string name, WorldPosition3D position, float screenWidth)
+        {
+            try
+            {
+                var exportData = new SavedLocationExport
+                {
+                    Name = name,
+                    Position = position,
+                    ScreenWidth = screenWidth
+                };
+
+                var json = JsonConvert.SerializeObject(exportData, Formatting.Indented);
+                System.Windows.Forms.Clipboard.SetText(json);
+                Logger.Debug($"Exported location '{name}' to clipboard");
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"Failed to export location to clipboard: {ex.Message}");
             }
         }
 
@@ -427,25 +439,16 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private void UpdateVisibility()
         {
             bool isEnabled = _cinemaSettings.IsEnabled;
-            
+
             if (_displayModeDropdown != null)
             {
                 _displayModeDropdown.Enabled = isEnabled;
             }
 
-            if (_windowHelpSection != null)
-            {
-                bool showWindowHelp = isEnabled && _settings.DisplayMode == CinemaDisplayMode.OnScreen;
-                _windowHelpSection.Visible = showWindowHelp;
-                _windowHelpSection.Height = showWindowHelp ? -1 : 0;
-            }
+            if (_windowHelpSection == null || _locationSection == null) return;
 
-            if (_locationSection != null)
-            {
-                bool showLocations = isEnabled && _settings.DisplayMode == CinemaDisplayMode.InGame;
-                _locationSection.Visible = showLocations;
-                _locationSection.Height = showLocations ? -1 : 0;
-            }
+            _windowHelpSection.Visible = isEnabled && _settings.DisplayMode == CinemaDisplayMode.OnScreen;
+            _locationSection.Visible = isEnabled && _settings.DisplayMode == CinemaDisplayMode.InGame;
         }
 
         private CinemaDisplayMode ParseDisplayMode(string name)
@@ -505,7 +508,9 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         protected override void Unload()
         {
+            _settings.SavedLocationsChanged -= _savedLocationsChangedHandler;
             _presetService.PresetsLoaded -= _presetsLoadedHandler;
+            _cinemaSettings.EnabledSetting.SettingChanged -= _enabledSettingChangedHandler;
             _editorWindow?.Dispose();
             _presetInfoWindow?.Dispose();
             base.Unload();

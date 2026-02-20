@@ -27,9 +27,6 @@ namespace CinemaModule.Services
 
         public Gw2MapService(string cacheDirectory)
         {
-            if (string.IsNullOrWhiteSpace(cacheDirectory))
-                throw new ArgumentException("Cache directory cannot be null or empty.", nameof(cacheDirectory));
-
             _httpClient = new HttpClient();
             _mapNameCache = new Dictionary<int, string>();
             _cacheFilePath = Path.Combine(cacheDirectory, CacheFileName);

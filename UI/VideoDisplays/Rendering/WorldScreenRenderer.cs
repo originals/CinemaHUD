@@ -5,7 +5,7 @@ using CinemaModule.Services;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace CinemaModule.UI.Displays.Rendering
+namespace CinemaModule.UI.VideoDisplays.Rendering
 {
     public class WorldScreenRenderer : IDisposable
     {
@@ -18,6 +18,11 @@ namespace CinemaModule.UI.Displays.Rendering
 
         private static readonly Color InnerFrameSideColor = new Color(31, 31, 31);
         private static readonly Color InnerFrameTopBottomColor = new Color(35, 35, 36);
+
+        private static readonly Vector2[] StandardTexCoords = {
+            new Vector2(0, 0), new Vector2(1, 0),
+            new Vector2(1, 1), new Vector2(0, 1)
+        };
 
         private readonly ScreenCornerCalculator _corners;
         private readonly short[] _quadIndices = { 0, 1, 2, 0, 2, 3 };
@@ -41,13 +46,12 @@ namespace CinemaModule.UI.Displays.Rendering
 
         public WorldScreenRenderer(ScreenCornerCalculator corners)
         {
-            _corners = corners ?? throw new ArgumentNullException(nameof(corners));
+            _corners = corners;
         }
 
         public void Initialize(GraphicsDevice graphicsDevice)
         {
             if (_initialized) return;
-            if (graphicsDevice == null) return;
 
             try
             {
@@ -82,12 +86,12 @@ namespace CinemaModule.UI.Displays.Rendering
             Texture2D videoTexture,
             float opacity)
         {
-            if (!_initialized || !_corners.IsValid || graphicsDevice == null) return;
+            if (!_initialized || !_corners.IsValid) return;
 
             var savedState = SaveGraphicsState(graphicsDevice);
             try
             {
-                BuildVertices(opacity);
+                Color texturedColor = BuildVertices(opacity);
                 SetRenderState(graphicsDevice);
 
                 _basicEffect.World = Matrix.Identity;
@@ -95,7 +99,7 @@ namespace CinemaModule.UI.Displays.Rendering
                 _basicEffect.Projection = projectionMatrix;
 
                 RenderBackPanel(graphicsDevice);
-                RenderBackLogo(graphicsDevice, opacity);
+                RenderBackLogo(graphicsDevice, texturedColor);
                 RenderVideoQuad(graphicsDevice, videoTexture);
                 RenderInnerFrame(graphicsDevice);
                 RenderSidePanels(graphicsDevice);
@@ -110,23 +114,20 @@ namespace CinemaModule.UI.Displays.Rendering
             }
         }
 
-        private void BuildVertices(float opacity)
+        private Color BuildVertices(float opacity)
         {
             byte alpha = CalculateAlpha(opacity);
-            
+
             Color sideColorWithAlpha = ApplyAlpha(InnerFrameSideColor, alpha);
             Color topBottomColorWithAlpha = ApplyAlpha(InnerFrameTopBottomColor, alpha);
             Color texturedColor = CreateOpaqueColorWithAlpha(alpha);
 
-            Vector2[] texCoords = {
-                new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(1, 1), new Vector2(0, 1)
-            };
-
-            BuildQuadVertices(_quadVertices, _corners.WorldCorners, texturedColor, texCoords);
-            BuildBackVertices(texturedColor, texCoords);
-            BuildSideVertices(texturedColor, texturedColor);
+            BuildQuadVertices(_quadVertices, _corners.WorldCorners, texturedColor);
+            BuildBackVertices(texturedColor);
+            BuildSideVertices(texturedColor);
             BuildInnerFrameVertices(sideColorWithAlpha, topBottomColorWithAlpha);
+
+            return texturedColor;
         }
 
         private static byte CalculateAlpha(float opacity)
@@ -144,81 +145,63 @@ namespace CinemaModule.UI.Displays.Rendering
             return new Color(MaxAlpha, MaxAlpha, MaxAlpha, alpha);
         }
 
-        private void BuildQuadVertices(VertexPositionColorTexture[] vertices, Vector3[] corners, Color color, Vector2[] texCoords)
+        private void BuildQuadVertices(VertexPositionColorTexture[] vertices, Vector3[] corners, Color color)
         {
             for (int i = 0; i < VerticesPerQuad; i++)
             {
-                vertices[i] = new VertexPositionColorTexture(corners[i], color, texCoords[i]);
+                vertices[i] = new VertexPositionColorTexture(corners[i], color, StandardTexCoords[i]);
             }
         }
 
-        private void BuildBackVertices(Color color, Vector2[] texCoords)
+        private void BuildBackVertices(Color color)
         {
-            _backVertices[0] = new VertexPositionColorTexture(_corners.BackCorners[0], color, texCoords[0]);
-            _backVertices[1] = new VertexPositionColorTexture(_corners.BackCorners[3], color, texCoords[3]);
-            _backVertices[2] = new VertexPositionColorTexture(_corners.BackCorners[2], color, texCoords[2]);
-            _backVertices[3] = new VertexPositionColorTexture(_corners.BackCorners[1], color, texCoords[1]);
+            SetQuadVertex(ref _backVertices[0], _corners.BackCorners[0], color, 0);
+            SetQuadVertex(ref _backVertices[1], _corners.BackCorners[3], color, 3);
+            SetQuadVertex(ref _backVertices[2], _corners.BackCorners[2], color, 2);
+            SetQuadVertex(ref _backVertices[3], _corners.BackCorners[1], color, 1);
         }
 
-        private void BuildSideVertices(Color sideColor, Color topBottomColor)
+        private static void SetQuadVertex(ref VertexPositionColorTexture vertex, Vector3 position, Color color, int texCoordIndex)
         {
-            // Left side
-            _sideVertices[0] = new VertexPositionColorTexture(_corners.BorderCorners[0], sideColor, new Vector2(0, 0));
-            _sideVertices[1] = new VertexPositionColorTexture(_corners.BorderCorners[3], sideColor, new Vector2(0, 1));
-            _sideVertices[2] = new VertexPositionColorTexture(_corners.BackCorners[3], sideColor, new Vector2(1, 1));
-            _sideVertices[3] = new VertexPositionColorTexture(_corners.BackCorners[0], sideColor, new Vector2(1, 0));
+            vertex = new VertexPositionColorTexture(position, color, StandardTexCoords[texCoordIndex]);
+        }
 
-            // Right side
-            _sideVertices[4] = new VertexPositionColorTexture(_corners.BorderCorners[1], sideColor, new Vector2(0, 0));
-            _sideVertices[5] = new VertexPositionColorTexture(_corners.BackCorners[1], sideColor, new Vector2(1, 0));
-            _sideVertices[6] = new VertexPositionColorTexture(_corners.BackCorners[2], sideColor, new Vector2(1, 1));
-            _sideVertices[7] = new VertexPositionColorTexture(_corners.BorderCorners[2], sideColor, new Vector2(0, 1));
+        private void BuildSideVertices(Color color)
+        {
+            BuildSideQuad(0, _corners.BorderCorners[0], _corners.BorderCorners[3], _corners.BackCorners[3], _corners.BackCorners[0], color);
+            BuildSideQuad(4, _corners.BorderCorners[1], _corners.BackCorners[1], _corners.BackCorners[2], _corners.BorderCorners[2], color);
+            BuildSideQuad(8, _corners.BorderCorners[0], _corners.BackCorners[0], _corners.BackCorners[1], _corners.BorderCorners[1], color);
+            BuildSideQuad(12, _corners.BorderCorners[3], _corners.BorderCorners[2], _corners.BackCorners[2], _corners.BackCorners[3], color);
+        }
 
-            // Top side
-            _sideVertices[8] = new VertexPositionColorTexture(_corners.BorderCorners[0], topBottomColor, new Vector2(0, 0));
-            _sideVertices[9] = new VertexPositionColorTexture(_corners.BackCorners[0], topBottomColor, new Vector2(0, 1));
-            _sideVertices[10] = new VertexPositionColorTexture(_corners.BackCorners[1], topBottomColor, new Vector2(1, 1));
-            _sideVertices[11] = new VertexPositionColorTexture(_corners.BorderCorners[1], topBottomColor, new Vector2(1, 0));
-
-            // Bottom side
-            _sideVertices[12] = new VertexPositionColorTexture(_corners.BorderCorners[3], topBottomColor, new Vector2(0, 0));
-            _sideVertices[13] = new VertexPositionColorTexture(_corners.BorderCorners[2], topBottomColor, new Vector2(1, 0));
-            _sideVertices[14] = new VertexPositionColorTexture(_corners.BackCorners[2], topBottomColor, new Vector2(1, 1));
-            _sideVertices[15] = new VertexPositionColorTexture(_corners.BackCorners[3], topBottomColor, new Vector2(0, 1));
+        private void BuildSideQuad(int startIndex, Vector3 v0, Vector3 v1, Vector3 v2, Vector3 v3, Color color)
+        {
+            SetQuadVertex(ref _sideVertices[startIndex], v0, color, 0);
+            SetQuadVertex(ref _sideVertices[startIndex + 1], v1, color, 3);
+            SetQuadVertex(ref _sideVertices[startIndex + 2], v2, color, 2);
+            SetQuadVertex(ref _sideVertices[startIndex + 3], v3, color, 1);
         }
 
         private void BuildInnerFrameVertices(Color sideColor, Color topBottomColor)
         {
-            // These connect the front border face to the recessed video quad
-            // Top inner bevel (border top edge to video top edge)
-            _innerFrameVertices[0] = new VertexPositionColorTexture(_corners.BorderCorners[0], topBottomColor, new Vector2(0, 0));
-            _innerFrameVertices[1] = new VertexPositionColorTexture(_corners.BorderCorners[1], topBottomColor, new Vector2(1, 0));
-            _innerFrameVertices[2] = new VertexPositionColorTexture(_corners.InnerFrameCorners[1], topBottomColor, new Vector2(1, 1));
-            _innerFrameVertices[3] = new VertexPositionColorTexture(_corners.InnerFrameCorners[0], topBottomColor, new Vector2(0, 1));
+            BuildInnerFrameQuad(0, _corners.BorderCorners[0], _corners.BorderCorners[1], _corners.InnerFrameCorners[1], _corners.InnerFrameCorners[0], topBottomColor);
+            BuildInnerFrameQuad(4, _corners.InnerFrameCorners[3], _corners.InnerFrameCorners[2], _corners.BorderCorners[2], _corners.BorderCorners[3], topBottomColor);
+            BuildInnerFrameQuad(8, _corners.BorderCorners[0], _corners.InnerFrameCorners[0], _corners.InnerFrameCorners[3], _corners.BorderCorners[3], sideColor);
+            BuildInnerFrameQuad(12, _corners.InnerFrameCorners[1], _corners.BorderCorners[1], _corners.BorderCorners[2], _corners.InnerFrameCorners[2], sideColor);
+        }
 
-            // Bottom inner bevel (video bottom edge to border bottom edge)
-            _innerFrameVertices[4] = new VertexPositionColorTexture(_corners.InnerFrameCorners[3], topBottomColor, new Vector2(0, 0));
-            _innerFrameVertices[5] = new VertexPositionColorTexture(_corners.InnerFrameCorners[2], topBottomColor, new Vector2(1, 0));
-            _innerFrameVertices[6] = new VertexPositionColorTexture(_corners.BorderCorners[2], topBottomColor, new Vector2(1, 1));
-            _innerFrameVertices[7] = new VertexPositionColorTexture(_corners.BorderCorners[3], topBottomColor, new Vector2(0, 1));
-
-            // Left inner bevel (border left edge to video left edge)
-            _innerFrameVertices[8] = new VertexPositionColorTexture(_corners.BorderCorners[0], sideColor, new Vector2(0, 0));
-            _innerFrameVertices[9] = new VertexPositionColorTexture(_corners.InnerFrameCorners[0], sideColor, new Vector2(1, 0));
-            _innerFrameVertices[10] = new VertexPositionColorTexture(_corners.InnerFrameCorners[3], sideColor, new Vector2(1, 1));
-            _innerFrameVertices[11] = new VertexPositionColorTexture(_corners.BorderCorners[3], sideColor, new Vector2(0, 1));
-
-            // Right inner bevel (video right edge to border right edge)
-            _innerFrameVertices[12] = new VertexPositionColorTexture(_corners.InnerFrameCorners[1], sideColor, new Vector2(0, 0));
-            _innerFrameVertices[13] = new VertexPositionColorTexture(_corners.BorderCorners[1], sideColor, new Vector2(1, 0));
-            _innerFrameVertices[14] = new VertexPositionColorTexture(_corners.BorderCorners[2], sideColor, new Vector2(1, 1));
-            _innerFrameVertices[15] = new VertexPositionColorTexture(_corners.InnerFrameCorners[2], sideColor, new Vector2(0, 1));
+        private void BuildInnerFrameQuad(int startIndex, Vector3 v0, Vector3 v1, Vector3 v2, Vector3 v3, Color color)
+        {
+            SetQuadVertex(ref _innerFrameVertices[startIndex], v0, color, 0);
+            SetQuadVertex(ref _innerFrameVertices[startIndex + 1], v1, color, 1);
+            SetQuadVertex(ref _innerFrameVertices[startIndex + 2], v2, color, 2);
+            SetQuadVertex(ref _innerFrameVertices[startIndex + 3], v3, color, 3);
         }
 
         private void RenderBackPanel(GraphicsDevice graphicsDevice)
         {
             _basicEffect.Texture = GetTextureOrFallback(_backTexture);
-            ApplyEffectAndDraw(graphicsDevice, () => DrawQuad(graphicsDevice, _backVertices));
+            ApplyEffectAndDrawQuad(graphicsDevice, _backVertices, 0);
         }
 
         private void RenderSidePanels(GraphicsDevice graphicsDevice)
@@ -228,34 +211,26 @@ namespace CinemaModule.UI.Displays.Rendering
 
             for (int sideIndex = 0; sideIndex < QuadCount; sideIndex++)
             {
-                bool isLeftOrRight = sideIndex < 2;
-                _basicEffect.Texture = isLeftOrRight ? sideTex : topBottomTex;
-                int vertexOffset = sideIndex * VerticesPerQuad;
-                ApplyEffectAndDraw(graphicsDevice, () => DrawIndexedQuad(graphicsDevice, _sideVertices, vertexOffset));
+                _basicEffect.Texture = sideIndex < 2 ? sideTex : topBottomTex;
+                ApplyEffectAndDrawQuad(graphicsDevice, _sideVertices, sideIndex * VerticesPerQuad);
             }
         }
 
         private void RenderInnerFrame(GraphicsDevice graphicsDevice)
         {
             _basicEffect.Texture = CinemaModule.Instance.TextureService.GetWhitePixel();
+            ApplyEffect();
 
-            ApplyEffectAndDraw(graphicsDevice, () =>
+            for (int bevelIndex = 0; bevelIndex < QuadCount; bevelIndex++)
             {
-                for (int bevelIndex = 0; bevelIndex < QuadCount; bevelIndex++)
-                {
-                    int vertexOffset = bevelIndex * VerticesPerQuad;
-                    DrawIndexedQuad(graphicsDevice, _innerFrameVertices, vertexOffset);
-                }
-            });
+                DrawIndexedQuad(graphicsDevice, _innerFrameVertices, bevelIndex * VerticesPerQuad);
+            }
         }
 
-        private void RenderBackLogo(GraphicsDevice graphicsDevice, float opacity)
+        private void RenderBackLogo(GraphicsDevice graphicsDevice, Color color)
         {
-            byte alpha = CalculateAlpha(opacity);
-            Color videoColor = CreateOpaqueColorWithAlpha(alpha);
-
-            RenderLogoTexture(graphicsDevice, videoColor);
-            RenderTextTexture(graphicsDevice, videoColor);
+            RenderLogoTexture(graphicsDevice, color);
+            RenderTextTexture(graphicsDevice, color);
         }
 
         private void RenderLogoTexture(GraphicsDevice graphicsDevice, Color color)
@@ -263,13 +238,13 @@ namespace CinemaModule.UI.Displays.Rendering
             Texture2D logoTex = _logoTexture?.Texture;
             if (!CinemaModule.Instance.TextureService.IsTextureReady(logoTex)) return;
 
-            _logoVertices[0] = new VertexPositionColorTexture(_corners.LogoCorners[0], color, new Vector2(0, 0));
-            _logoVertices[1] = new VertexPositionColorTexture(_corners.LogoCorners[3], color, new Vector2(0, 1));
-            _logoVertices[2] = new VertexPositionColorTexture(_corners.LogoCorners[2], color, new Vector2(1, 1));
-            _logoVertices[3] = new VertexPositionColorTexture(_corners.LogoCorners[1], color, new Vector2(1, 0));
+            SetQuadVertex(ref _logoVertices[0], _corners.LogoCorners[0], color, 0);
+            SetQuadVertex(ref _logoVertices[1], _corners.LogoCorners[3], color, 3);
+            SetQuadVertex(ref _logoVertices[2], _corners.LogoCorners[2], color, 2);
+            SetQuadVertex(ref _logoVertices[3], _corners.LogoCorners[1], color, 1);
 
             _basicEffect.Texture = logoTex;
-            ApplyEffectAndDraw(graphicsDevice, () => DrawQuad(graphicsDevice, _logoVertices));
+            ApplyEffectAndDrawQuad(graphicsDevice, _logoVertices, 0);
         }
 
         private void RenderTextTexture(GraphicsDevice graphicsDevice, Color color)
@@ -277,13 +252,13 @@ namespace CinemaModule.UI.Displays.Rendering
             Texture2D textTex = _logoTextTexture?.Texture;
             if (!CinemaModule.Instance.TextureService.IsTextureReady(textTex)) return;
 
-            _textVertices[0] = new VertexPositionColorTexture(_corners.TextCorners[0], color, new Vector2(1, 0));
-            _textVertices[1] = new VertexPositionColorTexture(_corners.TextCorners[3], color, new Vector2(1, 1));
-            _textVertices[2] = new VertexPositionColorTexture(_corners.TextCorners[2], color, new Vector2(0, 1));
-            _textVertices[3] = new VertexPositionColorTexture(_corners.TextCorners[1], color, new Vector2(0, 0));
+            SetQuadVertex(ref _textVertices[0], _corners.TextCorners[0], color, 1);
+            SetQuadVertex(ref _textVertices[1], _corners.TextCorners[3], color, 2);
+            SetQuadVertex(ref _textVertices[2], _corners.TextCorners[2], color, 3);
+            SetQuadVertex(ref _textVertices[3], _corners.TextCorners[1], color, 0);
 
             _basicEffect.Texture = textTex;
-            ApplyEffectAndDraw(graphicsDevice, () => DrawQuad(graphicsDevice, _textVertices));
+            ApplyEffectAndDrawQuad(graphicsDevice, _textVertices, 0);
         }
 
         private void RenderVideoQuad(GraphicsDevice graphicsDevice, Texture2D videoTexture)
@@ -292,12 +267,7 @@ namespace CinemaModule.UI.Displays.Rendering
                 ? videoTexture
                 : GetTextureOrFallback(_screenOffTexture);
 
-            ApplyEffectAndDraw(graphicsDevice, () => DrawQuad(graphicsDevice, _quadVertices));
-        }
-
-        private void DrawQuad(GraphicsDevice graphicsDevice, VertexPositionColorTexture[] vertices)
-        {
-            DrawIndexedQuad(graphicsDevice, vertices, 0);
+            ApplyEffectAndDrawQuad(graphicsDevice, _quadVertices, 0);
         }
 
         private void DrawIndexedQuad(GraphicsDevice graphicsDevice, VertexPositionColorTexture[] vertices, int vertexOffset)
@@ -317,13 +287,18 @@ namespace CinemaModule.UI.Displays.Rendering
             return asyncTexture?.Texture ?? CinemaModule.Instance.TextureService.GetWhitePixel();
         }
 
-        private void ApplyEffectAndDraw(GraphicsDevice graphicsDevice, Action drawAction)
+        private void ApplyEffect()
         {
             foreach (var pass in _basicEffect.CurrentTechnique.Passes)
             {
                 pass.Apply();
-                drawAction();
             }
+        }
+
+        private void ApplyEffectAndDrawQuad(GraphicsDevice graphicsDevice, VertexPositionColorTexture[] vertices, int vertexOffset)
+        {
+            ApplyEffect();
+            DrawIndexedQuad(graphicsDevice, vertices, vertexOffset);
         }
 
         private (RasterizerState rasterizer, SamplerState sampler, BlendState blend, DepthStencilState depth) SaveGraphicsState(GraphicsDevice graphicsDevice)

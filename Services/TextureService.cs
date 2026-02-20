@@ -20,18 +20,26 @@ namespace CinemaModule.Services
 
         #region Texture Names
 
-        private const string CornerIconTexture = "cinemahudx64.png";
-        private const string EmblemTexture = "cinemahudx90.png";
-        private const string LogoTexture = "quaggantv_highres.png";
-        private const string LogoTextTexture = "cinemahudtext.png";
-        private const string SmallWindowBackgroundTexture = "bgwindow3.png";
-        private const string TwitchIconTextureName = "twitchicon.png";
-        private const string PauseIconTexture = "pause.png";
+        private const string CornerIconTexture = "logo_64.png";
+        private const string EmblemTexture = "logo_90.png";
+        private const string LogoTexture = "logo_highres.png";
+        private const string LogoTextTexture = "logo_text.png";
+        private const string SmallWindowBackgroundTexture = "window_background.png";
+        private const string TwitchIconTextureName = "icon_twitch.png";
+        private const string TwitchBigTexture = "icon_twitch_large.png";
+        private const string PauseIconTexture = "icon_pause.png";
+        private const string WaypointIconTexture = "icon_waypoint.png";
+        private const string DeleteIconTexture = "icon_delete.png";
+        private const string ExportIconTexture = "icon_export.png";
+        private const string ImportIconTexture = "icon_import.png";
 
-        private const string TvSideTexture = "tv_side.png";
-        private const string TvTopBottomTexture = "tv_topbottom.png";
-        private const string TvBackTexture = "tv_back.png";
-        private const string TvScreenOffTexture = "tv_screenoff.png";
+        private const string YoutubeIconTexture = "icon_youtube.png";
+        private const string TvSideTexture = "tv_frame_side.png";
+        private const string TvTopBottomTexture = "tv_frame_topbottom.png";
+        private const string TvBackTexture = "tv_frame_back.png";
+        private const string TvScreenOffTexture = "tv_screen_off.png";
+        private const string SeekBarBackgroundTexture = "155208_background.png";
+        private const string ChatBackgroundTexture = "window_background_chat.png";
 
         #endregion
 
@@ -50,12 +58,18 @@ namespace CinemaModule.Services
         public AsyncTexture2D GetLogoText() => GetTexture(LogoTextTexture);
         public AsyncTexture2D GetSmallWindowBackground() => GetTexture(SmallWindowBackgroundTexture);
         public AsyncTexture2D GetTwitchIcon() => GetTexture(TwitchIconTextureName);
+        public AsyncTexture2D GetTwitchBigIcon() => GetTexture(TwitchBigTexture);
         public AsyncTexture2D GetPauseIcon() => GetTexture(PauseIconTexture);
+        public AsyncTexture2D GetDeleteIcon() => GetTexture(DeleteIconTexture);
+        public AsyncTexture2D GetExportIcon() => GetTexture(ExportIconTexture);
+        public AsyncTexture2D GetImportIcon() => GetTexture(ImportIconTexture);
+        public AsyncTexture2D GetYoutubeIcon() => GetTexture(YoutubeIconTexture);
         public AsyncTexture2D GetDefaultAvatar() => GetTexture(CornerIconTexture);
         public AsyncTexture2D GetTvSide() => GetTexture(TvSideTexture);
         public AsyncTexture2D GetTvTopBottom() => GetTexture(TvTopBottomTexture);
         public AsyncTexture2D GetTvBack() => GetTexture(TvBackTexture);
         public AsyncTexture2D GetTvScreenOff() => GetTexture(TvScreenOffTexture);
+        public AsyncTexture2D GetChatBackground() => GetTexture(ChatBackgroundTexture);
 
         #endregion
 
@@ -70,18 +84,23 @@ namespace CinemaModule.Services
         public AsyncTexture2D GetCloseIcon() => AsyncTexture2D.FromAssetId(255443);
         public AsyncTexture2D GetQualityIcon() => AsyncTexture2D.FromAssetId(440023);
         public AsyncTexture2D GetVolumeBackground() => AsyncTexture2D.FromAssetId(155208);
+        public AsyncTexture2D GetSeekBarBackground() => GetTexture(SeekBarBackgroundTexture);
         public AsyncTexture2D GetResizeCorner() => AsyncTexture2D.FromAssetId(156009);
         public AsyncTexture2D GetResizeCornerActive() => AsyncTexture2D.FromAssetId(156010);
+        public AsyncTexture2D GetLockIcon() => AsyncTexture2D.FromAssetId(733265);
+        public AsyncTexture2D GetLockActiveIcon() => AsyncTexture2D.FromAssetId(733266);
         public AsyncTexture2D GetDisplayIcon() => AsyncTexture2D.FromAssetId(358406);
         public AsyncTexture2D GetSourceIcon() => AsyncTexture2D.FromAssetId(156909);
         public AsyncTexture2D GetCopyIcon() => AsyncTexture2D.FromAssetId(2208347);
-        public AsyncTexture2D GetImportIcon() => AsyncTexture2D.FromAssetId(2208351);
         public AsyncTexture2D GetCardBackground() => AsyncTexture2D.FromAssetId(154960);
         public AsyncTexture2D GetWindowTexture() => AsyncTexture2D.FromAssetId(155997);
+        public AsyncTexture2D GetSetScreenIcon() => AsyncTexture2D.FromAssetId(528726);
+        public AsyncTexture2D GetWaypointIcon() => AsyncTexture2D.FromAssetId(156628);
+        public AsyncTexture2D GetInfoIcon() => AsyncTexture2D.FromAssetId(1508665);
 
         #endregion
 
-        #region URL-Based Images
+        #region URL Based Images
 
         public async Task<AsyncTexture2D> GetImageFromUrlAsync(string cacheKey, string imageUrl)
         {

@@ -15,11 +15,11 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         private const float MoveStep = 0.5f;
         private const float RotateStep = 5f;
         private const float DefaultScreenDistanceFromPlayer = 10f;
-        private const float DefaultScreenHeightAbovePlayer = 3f;
+        private const float DefaultScreenHeightAbovePlayer = 2f;
 
         private readonly CinemaUserSettings _settings;
         private readonly CinemaController _controller;
-        private new SavedLocation _location;
+        private SavedLocation _editingLocation;
 
         private TextBox _nameTextBox;
         private Label _positionLabel;
@@ -31,6 +31,8 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         {
             _settings = settings;
             _controller = controller;
+
+            Initialize();
         }
 
         protected override void BuildContent()
@@ -238,8 +240,8 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         public void CreateNew()
         {
             var position = CreatePositionFromPlayer();
-            _location = _settings.AddSavedLocation("New Location", position, _settings.WorldScreenWidth);
-            _controller.SelectSavedLocation(_location.Id);
+            _editingLocation = _settings.AddSavedLocation("New Location", position, _settings.WorldScreenWidth);
+            _controller.SelectSavedLocation(_editingLocation.Id);
 
             Title = "New Location";
             LoadLocationIntoUI();
@@ -267,8 +269,8 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 
         public void Edit(SavedLocation location)
         {
-            _location = location;
-            
+            _editingLocation = location;
+
             if (_settings.SelectedSavedLocationId != location.Id)
             {
                 _controller.SelectSavedLocation(location.Id);
@@ -281,17 +283,17 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 
         private void LoadLocationIntoUI()
         {
-            _nameTextBox.Text = _location?.Name ?? "";
-            _widthTrackBar.Value = _location?.ScreenWidth ?? 10f;
+            _nameTextBox.Text = _editingLocation?.Name ?? "";
+            _widthTrackBar.Value = _editingLocation?.ScreenWidth ?? 10f;
             _widthValueLabel.Text = $"{_widthTrackBar.Value:F0}m";
             UpdatePositionLabel();
         }
 
         private void UpdatePositionLabel()
         {
-            if (_location?.Position != null && _location.Position.MapId != 0)
+            if (_editingLocation?.Position != null && _editingLocation.Position.MapId != 0)
             {
-                var pos = _location.Position;
+                var pos = _editingLocation.Position;
                 _positionLabel.Text = $"X: {pos.X:F1} Y: {pos.Y:F1} Z: {pos.Z:F1} | Yaw: {pos.Yaw:F0}° Tilt: {pos.Pitch:F0}° | Map: {pos.MapId}";
             }
             else
@@ -302,102 +304,90 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 
         private void ApplyNameChange()
         {
-            if (_location == null) return;
-            
-            _location.Name = string.IsNullOrWhiteSpace(_nameTextBox.Text) ? "Unnamed Location" : _nameTextBox.Text;
-            _settings.UpdateSavedLocation(_location);
+            if (_editingLocation == null) return;
+
+            _editingLocation.Name = string.IsNullOrWhiteSpace(_nameTextBox.Text) ? "Unnamed Location" : _nameTextBox.Text;
+            _settings.UpdateSavedLocation(_editingLocation);
         }
 
         private void ApplyWidthChange()
         {
-            if (_location == null) return;
-            
-            _location.ScreenWidth = _widthTrackBar.Value;
-            _settings.UpdateSavedLocation(_location);
+            if (_editingLocation == null) return;
+
+            _editingLocation.ScreenWidth = _widthTrackBar.Value;
+            _settings.UpdateSavedLocation(_editingLocation);
             _settings.WorldScreenWidth = _widthTrackBar.Value;
         }
 
         private void ApplyPositionChange()
         {
-            if (_location == null) return;
-            
-            _settings.UpdateSavedLocation(_location);
-            if (_location.Position != null)
+            if (_editingLocation == null) return;
+
+            _settings.UpdateSavedLocation(_editingLocation);
+            if (_editingLocation.Position != null)
             {
                 _settings.WorldPosition = new WorldPosition3D(
-                    _location.Position.X,
-                    _location.Position.Y,
-                    _location.Position.Z,
-                    _location.Position.Yaw,
-                    _location.Position.Pitch,
-                    _location.Position.MapId);
+                    _editingLocation.Position.X,
+                    _editingLocation.Position.Y,
+                    _editingLocation.Position.Z,
+                    _editingLocation.Position.Yaw,
+                    _editingLocation.Position.Pitch,
+                    _editingLocation.Position.MapId);
             }
         }
 
         private void SetPositionFromPlayer()
         {
-            if (_location == null) return;
+            if (_editingLocation == null) return;
 
-            var mumble = GameService.Gw2Mumble;
-            if (mumble == null || !mumble.IsAvailable)
-            {
-                return;
-            }
+            var position = CreatePositionFromPlayer();
+            if (position.MapId == 0) return;
 
-            var playerPos = mumble.PlayerCharacter.Position;
-            var playerForward = mumble.PlayerCharacter.Forward;
-            var mapId = mumble.CurrentMap.Id;
-
-            var screenPos = playerPos + playerForward * DefaultScreenDistanceFromPlayer + new Vector3(0, 0, DefaultScreenHeightAbovePlayer);
-            var toPlayer = playerPos - screenPos;
-            float yaw = MathHelper.ToDegrees((float)Math.Atan2(toPlayer.X, toPlayer.Y));
-            yaw = WorldPosition3D.NormalizeYaw(yaw);
-
-            _location.Position = new WorldPosition3D(screenPos.X, screenPos.Y, screenPos.Z, yaw, 0, mapId);
+            _editingLocation.Position = position;
             ApplyPositionChange();
             UpdatePositionLabel();
         }
 
         private void MovePosition(float deltaX, float deltaY, float deltaZ)
         {
-            if (_location?.Position == null || _location.Position.MapId == 0)
+            if (_editingLocation?.Position == null || _editingLocation.Position.MapId == 0)
             {
                 return;
             }
 
-            _location.Position.X += deltaX;
-            _location.Position.Y += deltaY;
-            _location.Position.Z += deltaZ;
+            _editingLocation.Position.X += deltaX;
+            _editingLocation.Position.Y += deltaY;
+            _editingLocation.Position.Z += deltaZ;
             ApplyPositionChange();
             UpdatePositionLabel();
         }
 
         private void RotatePosition(float deltaYaw, float deltaPitch)
         {
-            if (_location?.Position == null || _location.Position.MapId == 0)
+            if (_editingLocation?.Position == null || _editingLocation.Position.MapId == 0)
             {
                 return;
             }
 
-            _location.Position.Yaw = WorldPosition3D.NormalizeYaw(_location.Position.Yaw + deltaYaw);
-            _location.Position.Pitch = MathHelper.Clamp(_location.Position.Pitch + deltaPitch, -89f, 89f);
+            _editingLocation.Position.Yaw = WorldPosition3D.NormalizeYaw(_editingLocation.Position.Yaw + deltaYaw);
+            _editingLocation.Position.Pitch = MathHelper.Clamp(_editingLocation.Position.Pitch + deltaPitch, -89f, 89f);
             ApplyPositionChange();
             UpdatePositionLabel();
         }
 
         private void ResetRotation()
         {
-            if (_location?.Position == null) return;
+            if (_editingLocation?.Position == null) return;
 
-            _location.Position.Yaw = 0;
-            _location.Position.Pitch = 0;
+            _editingLocation.Position.Yaw = 0;
+            _editingLocation.Position.Pitch = 0;
             ApplyPositionChange();
             UpdatePositionLabel();
         }
 
         private void FacePlayer()
         {
-            if (_location?.Position == null || _location.Position.MapId == 0)
+            if (_editingLocation?.Position == null || _editingLocation.Position.MapId == 0)
             {
                 return;
             }
@@ -409,31 +399,31 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             }
 
             var playerPos = mumble.PlayerCharacter.Position;
-            var screenPos = _location.Position.ToVector3();
+            var screenPos = _editingLocation.Position.ToVector3();
             var toPlayer = playerPos - screenPos;
 
             float yaw = MathHelper.ToDegrees((float)Math.Atan2(toPlayer.X, toPlayer.Y));
-            _location.Position.Yaw = WorldPosition3D.NormalizeYaw(yaw);
-            _location.Position.Pitch = 0;
+            _editingLocation.Position.Yaw = WorldPosition3D.NormalizeYaw(yaw);
+            _editingLocation.Position.Pitch = 0;
             ApplyPositionChange();
             UpdatePositionLabel();
         }
 
         private void CopyLocationToClipboard()
         {
-            if (_location == null) return;
+            if (_editingLocation == null) return;
 
             try
             {
                 var exportData = new SavedLocationExport
                 {
-                    Name = _location.Name,
-                    Position = _location.Position,
-                    ScreenWidth = _location.ScreenWidth
+                    Name = _editingLocation.Name,
+                    Position = _editingLocation.Position,
+                    ScreenWidth = _editingLocation.ScreenWidth
                 };
                 var json = JsonConvert.SerializeObject(exportData, Formatting.None);
                 System.Windows.Forms.Clipboard.SetText(json);
-                Logger.GetLogger(GetType()).Info($"Copied location '{_location.Name}' to clipboard");
+                Logger.GetLogger(GetType()).Info($"Copied location '{_editingLocation.Name}' to clipboard");
             }
             catch (Exception ex)
             {

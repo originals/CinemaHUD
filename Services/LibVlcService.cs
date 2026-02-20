@@ -82,7 +82,6 @@ namespace CinemaModule.Services
             {
                 string versionFilePath = Path.Combine(targetDir, VersionFileName);
                 File.WriteAllText(versionFilePath, LibVlcVersion);
-                Logger.Info($"LibVLC version {LibVlcVersion} marker written");
             }
             catch (Exception ex)
             {
@@ -123,8 +122,6 @@ namespace CinemaModule.Services
                         Logger.Warn($"Failed to delete directory {dir}: {ex.Message}");
                     }
                 }
-
-                Logger.Info("Cleared existing LibVLC files");
             }
             catch (Exception ex)
             {
@@ -148,8 +145,6 @@ namespace CinemaModule.Services
                     {
                         await stream.CopyToAsync(fileStream);
                     }
-
-                    Logger.Info($"Extracted {sourceFile} to {targetPath}");
                 }
                 else
                 {

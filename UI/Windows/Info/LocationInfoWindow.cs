@@ -9,6 +9,8 @@ namespace CinemaHUD.UI.Windows.Info
 {
     public class LocationInfoWindow : StandardWindow
     {
+        private static readonly Logger Logger = Logger.GetLogger<LocationInfoWindow>();
+
         private WorldLocationPresetData _currentPreset;
         private Image _screenshotImage;
         private Label _descriptionLabel;
@@ -88,9 +90,9 @@ namespace CinemaHUD.UI.Windows.Info
             {
                 ClipboardUtil.WindowsClipboardService.SetTextAsync(waypoint);
             }
-            catch
+            catch (System.Exception ex)
             {
-                // Clipboard operation failed -> ignore
+                Logger.Warn(ex, "Failed to copy waypoint to clipboard");
             }
         }
     }

@@ -13,7 +13,7 @@ namespace CinemaModule.Services
     public class PresetService : IDisposable
     {
         private static readonly Logger Logger = Logger.GetLogger<PresetService>();
-        private const string DefaultApiBaseUrl = "https://www.gw2opus.com/wp-json/cinemahud/v1";
+        private const string DefaultApiBaseUrl = "http://www.test.com/wp-json/cinemahud/v2";
         private const string ImageCacheSubfolder = "presets";
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
@@ -28,11 +28,14 @@ namespace CinemaModule.Services
         public IReadOnlyList<WorldLocationPresetData> WorldLocationPresets =>
             _cachedPresets?.WorldLocations ?? new List<WorldLocationPresetData>();
 
-        public IReadOnlyList<StreamPresetData> StreamPresets =>
-            _cachedPresets?.Streams ?? new List<StreamPresetData>();
+        public IReadOnlyList<StreamCategory> StreamCategories =>
+            _cachedPresets?.StreamCategories ?? new List<StreamCategory>();
 
         public IReadOnlyList<string> TwitchChannels =>
-            _cachedPresets?.TwitchChannels ?? new List<string>();
+            StreamCategories
+                .Where(c => c.IsTwitch)
+                .SelectMany(c => c.TwitchChannelNames)
+                .ToList();
 
 
         public bool IsLoaded => _isLoaded;
@@ -57,7 +60,6 @@ namespace CinemaModule.Services
         {
             try
             {
-                Logger.Info("Loading presets from API...");
                 var response = await _httpClient.GetAsync($"{_apiBaseUrl}/config");
 
                 if (!response.IsSuccessStatusCode)
@@ -68,12 +70,13 @@ namespace CinemaModule.Services
 
                 var json = await response.Content.ReadAsStringAsync();
                 _cachedPresets = JsonConvert.DeserializeObject<PresetsResponse>(json);
+
+                ParseStreamCategories();
+
                 _isLoaded = true;
 
-                Logger.Info($"Loaded {WorldLocationPresets.Count} world locations, {StreamPresets.Count} streams, {TwitchChannels.Count} Twitch channels");
-                
                 _ = LoadPresetImagesAsync();
-                
+
                 PresetsLoaded?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -82,18 +85,45 @@ namespace CinemaModule.Services
             }
         }
 
-        private async Task LoadPresetImagesAsync()
+        private void ParseStreamCategories()
         {
-            if (_cachedPresets?.WorldLocations == null || _cachedPresets.WorldLocations.Count == 0)
-                return;
+            if (_cachedPresets?.StreamCategories == null) return;
 
-            var tasks = _cachedPresets.WorldLocations.Select(LoadImagesForPresetAsync);
-            await Task.WhenAll(tasks);
-            
-            Logger.Debug($"Finished loading images for {_cachedPresets.WorldLocations.Count} world location presets");
+            foreach (var category in _cachedPresets.StreamCategories)
+            {
+                category.ParseChannels();
+            }
         }
 
-        private async Task LoadImagesForPresetAsync(WorldLocationPresetData preset)
+        private async Task LoadPresetImagesAsync()
+        {
+            var tasks = new List<Task>();
+
+            if (_cachedPresets?.WorldLocations != null && _cachedPresets.WorldLocations.Count > 0)
+            {
+                tasks.AddRange(_cachedPresets.WorldLocations.Select(LoadImagesForWorldLocationAsync));
+            }
+
+            if (_cachedPresets?.StreamCategories != null)
+            {
+                foreach (var category in _cachedPresets.StreamCategories)
+                {
+                    if (!string.IsNullOrEmpty(category.Icon))
+                    {
+                        tasks.Add(LoadCategoryIconAsync(category));
+                    }
+
+                    foreach (var channel in category.Channels)
+                    {
+                        tasks.Add(LoadImagesForChannelAsync(channel));
+                    }
+                }
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task LoadImagesForWorldLocationAsync(WorldLocationPresetData preset)
         {
             var avatarTask = _imageCache.GetImageAsync($"{preset.Id}_avatar", preset.Avatar);
             var pictureTask = _imageCache.GetImageAsync($"{preset.Id}_picture", preset.Picture);
@@ -102,6 +132,34 @@ namespace CinemaModule.Services
 
             preset.AvatarTexture = avatarTask.Result;
             preset.PictureTexture = pictureTask.Result;
+        }
+
+        private async Task LoadCategoryIconAsync(StreamCategory category)
+        {
+            if (string.IsNullOrEmpty(category.Icon))
+                return;
+
+            category.IconTexture = await _imageCache.GetImageAsync($"cat_{category.Id}_icon", category.Icon);
+        }
+
+        private async Task LoadImagesForChannelAsync(ChannelData channel)
+        {
+            var tasks = new List<Task>();
+
+            if (!string.IsNullOrEmpty(channel.Avatar))
+            {
+                tasks.Add(_imageCache.GetImageAsync($"ch_{channel.Id}_avatar", channel.Avatar)
+                    .ContinueWith(t => channel.AvatarTexture = t.Result, TaskContinuationOptions.OnlyOnRanToCompletion));
+            }
+
+            if (!string.IsNullOrEmpty(channel.StaticImage))
+            {
+                tasks.Add(_imageCache.GetImageAsync($"ch_{channel.Id}_static", channel.StaticImage)
+                    .ContinueWith(t => channel.StaticImageTexture = t.Result, TaskContinuationOptions.OnlyOnRanToCompletion));
+            }
+
+            if (tasks.Count > 0)
+                await Task.WhenAll(tasks);
         }
 
         public void Dispose()

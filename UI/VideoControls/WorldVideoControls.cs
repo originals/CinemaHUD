@@ -11,10 +11,18 @@ namespace CinemaModule.UI.Controls
 {
     public class WorldVideoControls : Container
     {
-        #region Fields
+        #region Constants
 
         private const int PanelHeight = 50;
         private const int ScreenMargin = 60;
+        private const int TimeDisplayWidth = 90;
+        private const int SeekBarWidth = 150;
+        private const int VideoControlsOffset = 30;
+        private const int SeekBarBackgroundPadding = 4;
+
+        #endregion
+
+        #region Fields
 
         private readonly BaseVideoControls _base;
 
@@ -23,6 +31,7 @@ namespace CinemaModule.UI.Controls
         private Rectangle _settingsBounds;
         private Rectangle _twitchChatBounds;
         private Rectangle _closeBounds;
+        private Rectangle _timeDisplayBounds;
 
         private bool _isHoveringPlayPause;
         private bool _isHoveringVolume;
@@ -32,6 +41,7 @@ namespace CinemaModule.UI.Controls
 
         private Tween _fadeAnimation;
         private bool _shouldBeVisible;
+        private bool _isSeekable;
 
         #endregion
 
@@ -61,6 +71,12 @@ namespace CinemaModule.UI.Controls
             remove => _base.QualityChanged -= value;
         }
 
+        public event EventHandler<float> SeekRequested
+        {
+            add => _base.SeekRequested += value;
+            remove => _base.SeekRequested -= value;
+        }
+
         public event EventHandler TwitchChatClicked;
 
         public event EventHandler CloseClicked;
@@ -81,9 +97,34 @@ namespace CinemaModule.UI.Controls
             set => _base.Volume = value;
         }
 
-        public bool IsTrackBarDragging => _base.VolumeTrackBar?.Dragging ?? false;
+        public bool IsTrackBarDragging => _base.VolumeTrackBar?.Dragging ?? false || _base.IsSeekBarDragging;
 
         public bool IsDropdownOpen => _base.QualityDropdown?.PanelOpen ?? false;
+
+        public bool IsSeekable
+        {
+            get => _isSeekable;
+            set
+            {
+                if (_isSeekable == value) return;
+                _isSeekable = value;
+                UpdateLayout();
+            }
+        }
+
+        public float CurrentPosition
+        {
+            get => _base.CurrentPosition;
+            set => _base.CurrentPosition = value;
+        }
+
+        public long Duration
+        {
+            get => _base.Duration;
+            set => _base.Duration = value;
+        }
+
+        private bool ShowSeekBar => _isSeekable && !_isTwitchStream;
 
         private bool _isTwitchStream;
         public bool IsTwitchStream
@@ -93,7 +134,7 @@ namespace CinemaModule.UI.Controls
             {
                 if (_isTwitchStream == value) return;
                 _isTwitchStream = value;
-                UpdateQualityDropdownBounds();
+                UpdateLayout();
             }
         }
 
@@ -105,9 +146,15 @@ namespace CinemaModule.UI.Controls
             Opacity = 0f;
             Visible = false;
 
-            _base = new BaseVideoControls(this, BaseVideoControls.TrackBarWidth, BaseVideoControls.TrackBarHeight, BaseVideoControls.QualityDropdownWidth);
+            _base = new BaseVideoControls(this, BaseVideoControls.TrackBarWidth, BaseVideoControls.TrackBarHeight, BaseVideoControls.QualityDropdownWidth, true);
 
+            UpdateLayout();
+        }
+
+        private void UpdateLayout()
+        {
             UpdateControlBounds();
+            UpdateSeekBarBounds();
             UpdateTrackBarBounds();
             UpdateQualityDropdownBounds();
         }
@@ -134,9 +181,36 @@ namespace CinemaModule.UI.Controls
                 centerY - BaseVideoControls.IconSize / 2,
                 BaseVideoControls.IconSize,
                 BaseVideoControls.IconSize);
+        }
+
+        private void UpdateSeekBarBounds()
+        {
+            int centerY = PanelHeight / 2;
+            int nextX = _playPauseBounds.Right + BaseVideoControls.ControlSpacing;
+
+            if (ShowSeekBar)
+            {
+                _base.SeekBar.Visible = Visible;
+                _base.SeekBar.Location = new Point(nextX, centerY - BaseVideoControls.SeekBarHeight / 2);
+                _base.SeekBar.Size = new Point(SeekBarWidth, BaseVideoControls.SeekBarHeight);
+
+                nextX = _base.SeekBar.Location.X + SeekBarWidth + BaseVideoControls.ControlSpacing;
+
+                _timeDisplayBounds = new Rectangle(
+                    nextX,
+                    centerY - BaseVideoControls.IconSize / 2,
+                    TimeDisplayWidth,
+                    BaseVideoControls.IconSize);
+
+                nextX += TimeDisplayWidth + BaseVideoControls.ControlSpacing;
+            }
+            else
+            {
+                _base.SeekBar.Visible = false;
+            }
 
             _volumeIconBounds = new Rectangle(
-                _playPauseBounds.Right + BaseVideoControls.ControlSpacing,
+                nextX,
                 centerY - BaseVideoControls.IconSize / 2,
                 BaseVideoControls.IconSize,
                 BaseVideoControls.IconSize);
@@ -145,7 +219,8 @@ namespace CinemaModule.UI.Controls
         private void UpdateTrackBarBounds()
         {
             int centerY = PanelHeight / 2;
-            _base.VolumeTrackBar.Location = new Point(_volumeIconBounds.Right + BaseVideoControls.ControlSpacing, centerY - BaseVideoControls.TrackBarHeight / 2);
+            int trackBarX = _volumeIconBounds.Right + BaseVideoControls.ControlSpacing;
+            _base.VolumeTrackBar.Location = new Point(trackBarX, centerY - BaseVideoControls.TrackBarHeight / 2);
             _base.VolumeTrackBar.Size = new Point(BaseVideoControls.TrackBarWidth, BaseVideoControls.TrackBarHeight);
         }
 
@@ -154,14 +229,11 @@ namespace CinemaModule.UI.Controls
             int centerY = PanelHeight / 2;
             int dropdownX = _base.VolumeTrackBar.Location.X + BaseVideoControls.TrackBarWidth + BaseVideoControls.ControlSpacing;
 
-            if (_base.QualityDropdown != null)
-            {
-                int dropdownY = centerY - _base.QualityDropdown.Height / 2;
-                _base.QualityDropdown.Location = new Point(dropdownX, dropdownY);
+            int dropdownY = centerY - _base.QualityDropdown.Height / 2;
+            _base.QualityDropdown.Location = new Point(dropdownX, dropdownY);
 
-                bool hasQualities = _base.QualityDropdown.Items.Count > 0;
-                _base.QualityDropdown.Visible = hasQualities;
-            }
+            bool hasQualities = _base.QualityDropdown.Items.Count > 0;
+            _base.QualityDropdown.Visible = hasQualities;
 
             int twitchChatX = dropdownX + BaseVideoControls.QualityDropdownWidth + BaseVideoControls.ControlSpacing;
             _twitchChatBounds = new Rectangle(
@@ -198,11 +270,11 @@ namespace CinemaModule.UI.Controls
             var screenHeight = GameService.Graphics.SpriteScreen.Height;
 
             int x = videoBounds.X + (videoBounds.Width - Width) / 2;
-            int y = videoBounds.Bottom + 30;
+            int y = videoBounds.Bottom + VideoControlsOffset;
 
             if (y + PanelHeight > screenHeight - ScreenMargin)
             {
-                y = videoBounds.Y - PanelHeight - 30;
+                y = videoBounds.Y - PanelHeight - VideoControlsOffset;
             }
 
             if (y < ScreenMargin)
@@ -223,6 +295,11 @@ namespace CinemaModule.UI.Controls
             _shouldBeVisible = true;
             Visible = true;
 
+            if (ShowSeekBar)
+            {
+                _base.SeekBar.Visible = true;
+            }
+
             _fadeAnimation?.Cancel();
             _fadeAnimation = GameService.Animation.Tweener
                 .Tween(this, new { Opacity = 1f }, BaseVideoControls.FadeDuration)
@@ -240,7 +317,11 @@ namespace CinemaModule.UI.Controls
             _fadeAnimation = GameService.Animation.Tweener
                 .Tween(this, new { Opacity = 0f }, BaseVideoControls.FadeDuration)
                 .Ease(Ease.QuadIn)
-                .OnComplete(() => Visible = false);
+                .OnComplete(() =>
+                {
+                    Visible = false;
+                    _base.SeekBar.Visible = false;
+                });
         }
 
         public void Reset()
@@ -251,12 +332,18 @@ namespace CinemaModule.UI.Controls
             Visible = false;
             Location = Point.Zero;
 
-            // Clear hover states to prevent stale UI
             _isHoveringPlayPause = false;
             _isHoveringVolume = false;
             _isHoveringSettings = false;
             _isHoveringTwitchChat = false;
             _isHoveringClose = false;
+
+            _base.CurrentPosition = 0f;
+            _base.Duration = 0;
+            _isSeekable = false;
+            _base.SeekBar.Value = 0;
+            _base.SeekBar.Visible = false;
+            UpdateLayout();
         }
 
         public void UpdateAvailableQualities(IReadOnlyList<string> qualityNames, int selectedIndex)
@@ -268,6 +355,11 @@ namespace CinemaModule.UI.Controls
         protected override void OnLeftMouseButtonPressed(MouseEventArgs e)
         {
             if (_base.VolumeTrackBar.AbsoluteBounds.Contains(e.MousePosition))
+            {
+                return;
+            }
+
+            if (_base.SeekBar.AbsoluteBounds.Contains(e.MousePosition))
             {
                 return;
             }
@@ -319,6 +411,9 @@ namespace CinemaModule.UI.Controls
             _isHoveringSettings = _settingsBounds.Contains(localPos);
             _isHoveringTwitchChat = IsTwitchStream && _twitchChatBounds.Contains(localPos);
             _isHoveringClose = _closeBounds.Contains(localPos);
+
+            _base.UpdateSeekBarDragState();
+            UpdateTooltip(localPos);
         }
 
         public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
@@ -333,6 +428,11 @@ namespace CinemaModule.UI.Controls
                 _playPauseBounds.Width,
                 _playPauseBounds.Height);
             _base.Renderer.DrawPlayPauseButton(spriteBatch, playPauseRect, IsPaused, _isHoveringPlayPause, Opacity, false);
+
+            if (ShowSeekBar)
+            {
+                DrawSeekBarSection(spriteBatch);
+            }
 
             var volumeRect = new Rectangle(
                 AbsoluteBounds.X + _volumeIconBounds.X,
@@ -365,6 +465,52 @@ namespace CinemaModule.UI.Controls
                 _closeBounds.Height);
             _base.Renderer.DrawCloseButton(spriteBatch, closeRect, _isHoveringClose, Opacity);
         }
+
+        private void UpdateTooltip(Point localPos)
+        {
+            if (_playPauseBounds.Contains(localPos))
+            {
+                BasicTooltipText = IsPaused ? "Play" : "Pause";
+            }
+            else if (_volumeIconBounds.Contains(localPos))
+            {
+                BasicTooltipText = Volume == 0 ? "Unmute" : "Mute";
+            }
+            else if (_settingsBounds.Contains(localPos))
+            {
+                BasicTooltipText = "Settings";
+            }
+            else if (IsTwitchStream && _twitchChatBounds.Contains(localPos))
+            {
+                BasicTooltipText = "Toggle Twitch Chat";
+            }
+            else if (_closeBounds.Contains(localPos))
+            {
+                BasicTooltipText = "Close";
+            }
+            else
+            {
+                BasicTooltipText = null;
+            }
+        }
+
+        private void DrawSeekBarSection(SpriteBatch spriteBatch)
+        {
+            var seekBarBgRect = new Rectangle(
+                AbsoluteBounds.X + _base.SeekBar.Location.X - SeekBarBackgroundPadding,
+                AbsoluteBounds.Y + _base.SeekBar.Location.Y - SeekBarBackgroundPadding,
+                _base.SeekBar.Size.X + _timeDisplayBounds.Width + BaseVideoControls.ControlSpacing + SeekBarBackgroundPadding * 2,
+                Math.Max(_base.SeekBar.Size.Y, _timeDisplayBounds.Height) + SeekBarBackgroundPadding * 2);
+            _base.Renderer.DrawSeekBarBackground(spriteBatch, seekBarBgRect, Opacity);
+
+            var timeRect = new Rectangle(
+                AbsoluteBounds.X + _timeDisplayBounds.X,
+                AbsoluteBounds.Y + _timeDisplayBounds.Y,
+                _timeDisplayBounds.Width,
+                _timeDisplayBounds.Height);
+            _base.Renderer.DrawTimeText(spriteBatch, _base.FormatTimeDisplay(), timeRect, Opacity);
+        }
+
         #endregion
 
         #region Cleanup

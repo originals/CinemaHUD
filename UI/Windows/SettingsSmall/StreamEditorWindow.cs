@@ -9,10 +9,18 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 {
     public class StreamEditorWindow : SmallWindow
     {
-        #region Fields
+        private const int TextBoxWidth = 350;
+        private const int DropdownWidth = 200;
+        private const int ButtonWidth = 100;
+        private const string SourceTypeTwitch = "Twitch Channel";
+        private const string SourceTypeUrl = "URL";
+        private const string UrlHelpText = "Supported formats:\n" +
+            "• Video files: MP4, MKV, AVI, WEBM\n" +
+            "• Live streams: M3U8, HLS, RTSP, RTMP\n" +
+            "• Radio/Audio: MP3, AAC, OGG streams\n" +
+            "• Local files: file:///C:/path/to/video.mp4";
 
         private readonly CinemaUserSettings _settings;
-
         private SavedStream _stream;
         private bool _isNewStream;
 
@@ -24,21 +32,16 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         private StandardButton _saveButton;
         private StandardButton _deleteButton;
 
-        #endregion
-
-        #region Events
-
         public event EventHandler StreamSaved;
         public event EventHandler StreamDeleted;
-
-        #endregion
 
         public StreamEditorWindow(CinemaUserSettings settings)
             : base("Add Stream")
         {
             _settings = settings;
-        }
 
+            Initialize();
+        }
 
         protected override void BuildContent()
         {
@@ -53,55 +56,69 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
                 Parent = this
             };
 
+            BuildNameSection(panel);
+            BuildSourceTypeSection(panel);
+            BuildValueSection(panel);
+            BuildButtons(panel);
+        }
+
+        private void BuildNameSection(Container parent)
+        {
             new Label
             {
                 Text = "Stream Name",
                 AutoSizeHeight = true,
                 AutoSizeWidth = true,
                 Font = GameService.Content.DefaultFont16,
-                Parent = panel
+                Parent = parent
             };
 
             _nameTextBox = new TextBox
             {
-                Width = 350,
+                Width = TextBoxWidth,
                 PlaceholderText = "Enter a name for this stream",
-                Parent = panel
+                Parent = parent
             };
+        }
 
+        private void BuildSourceTypeSection(Container parent)
+        {
             new Label
             {
                 Text = "Source Type",
                 AutoSizeHeight = true,
                 AutoSizeWidth = true,
                 Font = GameService.Content.DefaultFont16,
-                Parent = panel
+                Parent = parent
             };
 
             _sourceTypeDropdown = new Dropdown
             {
-                Width = 200,
-                Parent = panel
+                Width = DropdownWidth,
+                Parent = parent
             };
-            _sourceTypeDropdown.Items.Add("URL");
-            _sourceTypeDropdown.Items.Add("Twitch Channel");
-            _sourceTypeDropdown.SelectedItem = "Twitch Channel";
+            _sourceTypeDropdown.Items.Add(SourceTypeUrl);
+            _sourceTypeDropdown.Items.Add(SourceTypeTwitch);
+            _sourceTypeDropdown.SelectedItem = SourceTypeTwitch;
             _sourceTypeDropdown.ValueChanged += (s, e) => OnSourceTypeChanged();
+        }
 
+        private void BuildValueSection(Container parent)
+        {
             _valueLabel = new Label
             {
                 Text = "Stream URL / Channel",
                 AutoSizeHeight = true,
                 AutoSizeWidth = true,
                 Font = GameService.Content.DefaultFont16,
-                Parent = panel
+                Parent = parent
             };
 
             _valueTextBox = new TextBox
             {
-                Width = 350,
+                Width = TextBoxWidth,
                 PlaceholderText = "Enter URL or Twitch channel name",
-                Parent = panel
+                Parent = parent
             };
 
             _helpLabel = new Label
@@ -110,22 +127,25 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
                 AutoSizeHeight = true,
                 AutoSizeWidth = true,
                 TextColor = Color.White,
-                Parent = panel
+                Parent = parent
             };
+        }
 
+        private void BuildButtons(Container parent)
+        {
             var buttonPanel = new FlowPanel
             {
                 FlowDirection = ControlFlowDirection.LeftToRight,
                 WidthSizingMode = SizingMode.Fill,
                 HeightSizingMode = SizingMode.AutoSize,
                 ControlPadding = new Vector2(10, 0),
-                Parent = panel
+                Parent = parent
             };
 
             _saveButton = new StandardButton
             {
                 Text = "Save",
-                Width = 100,
+                Width = ButtonWidth,
                 Parent = buttonPanel
             };
             _saveButton.Click += (s, e) => Save();
@@ -133,7 +153,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             _deleteButton = new StandardButton
             {
                 Text = "Delete",
-                Width = 100,
+                Width = ButtonWidth,
                 Visible = false,
                 Parent = buttonPanel
             };
@@ -142,7 +162,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             var cancelButton = new StandardButton
             {
                 Text = "Cancel",
-                Width = 100,
+                Width = ButtonWidth,
                 Parent = buttonPanel
             };
             cancelButton.Click += (s, e) => Hide();
@@ -150,21 +170,13 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 
         private void OnSourceTypeChanged()
         {
-            bool isTwitch = _sourceTypeDropdown.SelectedItem == "Twitch Channel";
+            bool isTwitch = _sourceTypeDropdown.SelectedItem == SourceTypeTwitch;
 
             _valueLabel.Text = isTwitch ? "Channel Name" : "Stream URL";
-
             _valueTextBox.PlaceholderText = isTwitch 
                 ? "Channel name (e.g., phandrel)"
                 : "Enter stream or video URL";
-
-            _helpLabel.Text = isTwitch
-                ? ""
-                : "Supported formats:\n" +
-                  "• Video files: MP4, MKV, AVI, WEBM\n" +
-                  "• Live streams: M3U8, HLS, RTSP, RTMP\n" +
-                  "• Radio/Audio: MP3, AAC, OGG streams\n" +
-                  "• Local files: file:///C:/path/to/video.mp4";
+            _helpLabel.Text = isTwitch ? "" : UrlHelpText;
         }
 
         public void OpenForNew(StreamSourceType sourceType = StreamSourceType.TwitchChannel)
@@ -174,9 +186,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             Title = "Add Stream";
 
             _nameTextBox.Text = "";
-            _sourceTypeDropdown.SelectedItem = sourceType == StreamSourceType.TwitchChannel 
-                ? "Twitch Channel" 
-                : "URL";
+            _sourceTypeDropdown.SelectedItem = GetDropdownValue(sourceType);
             _valueTextBox.Text = "";
             _deleteButton.Visible = false;
 
@@ -186,16 +196,12 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 
         public void OpenForEdit(SavedStream stream)
         {
-            if (stream == null) return;
-
             _isNewStream = false;
             _stream = stream;
             Title = "Edit Stream";
 
             _nameTextBox.Text = stream.Name ?? "";
-            _sourceTypeDropdown.SelectedItem = stream.SourceType == StreamSourceType.TwitchChannel 
-                ? "Twitch Channel" 
-                : "URL";
+            _sourceTypeDropdown.SelectedItem = GetDropdownValue(stream.SourceType);
             _valueTextBox.Text = stream.Value ?? "";
             _deleteButton.Visible = true;
 
@@ -203,22 +209,20 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             Show();
         }
 
+        private string GetDropdownValue(StreamSourceType sourceType)
+        {
+            return sourceType == StreamSourceType.TwitchChannel ? SourceTypeTwitch : SourceTypeUrl;
+        }
+
         private void Save()
         {
             var name = _nameTextBox.Text.Trim();
             var value = _valueTextBox.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+            if (string.IsNullOrWhiteSpace(value)) return;
+            if (string.IsNullOrWhiteSpace(name)) name = value;
 
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                name = value;
-            }
-
-            var sourceType = _sourceTypeDropdown.SelectedItem == "Twitch Channel"
+            var sourceType = _sourceTypeDropdown.SelectedItem == SourceTypeTwitch
                 ? StreamSourceType.TwitchChannel
                 : StreamSourceType.Url;
 

@@ -5,7 +5,7 @@ using Blish_HUD;
 using LibVLCSharp.Shared;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace CinemaModule.Player
+namespace CinemaModule.VideoPlayer
 {
     public class VideoPlayerOptions
     {
@@ -81,6 +81,10 @@ namespace CinemaModule.Player
                 }
             }
         }
+
+        public long Length => _mediaPlayer?.Length ?? 0;
+
+        public bool IsSeekable => _mediaPlayer?.IsSeekable ?? false;
 
         public int VideoWidth => (int)_formatHandler.Width;
 
@@ -165,6 +169,17 @@ namespace CinemaModule.Player
             _mediaPlayer.Stopped += (s, e) => OnPlaybackStateChanged(PlaybackState.Stopped);
             _mediaPlayer.EndReached += (s, e) => OnPlaybackStateChanged(PlaybackState.Ended);
             _mediaPlayer.EncounteredError += (s, e) => OnPlaybackStateChanged(PlaybackState.Error);
+            _mediaPlayer.Buffering += (s, e) =>
+            {
+                if (e.Cache < 100f)
+                {
+                    OnPlaybackStateChanged(PlaybackState.Buffering);
+                }
+                else
+                {
+                    OnPlaybackStateChanged(PlaybackState.Playing);
+                }
+            };
             _mediaPlayer.ESAdded += (s, e) => 
             {
                 if (e.Type == TrackType.Video)
@@ -468,6 +483,7 @@ namespace CinemaModule.Player
         Stopped,
         Playing,
         Paused,
+        Buffering,
         Ended,
         Error
     }

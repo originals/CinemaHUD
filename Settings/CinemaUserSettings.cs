@@ -18,10 +18,6 @@ namespace CinemaModule.Settings
         private const float MinScreenWidth = 4f;
         private const float MaxScreenWidth = 50f;
         private const float ScreenWidthTolerance = 0.001f;
-        private const int MinWindowEdgeSpacing = 50;
-        private const int DefaultWindowX = 100;
-        private const int DefaultWindowY = 50;
-
         private readonly string _settingsFilePath;
         private CinemaUserSettingsData _data;
 
@@ -35,12 +31,30 @@ namespace CinemaModule.Settings
         public event EventHandler<float> WorldScreenWidthChanged;
         public event EventHandler<int> VolumeChanged;
         public event EventHandler<StreamSourceType> CurrentStreamSourceTypeChanged;
+        public event EventHandler<StreamPresetData> CurrentStreamPresetChanged;
         public event EventHandler SavedLocationsChanged;
         public event EventHandler SavedStreamsChanged;
 
         #endregion
 
+        #region Members (Runtime Only)
+
+        private StreamPresetData _currentStreamPreset;
+
+        #endregion
+
         #region Properties
+
+        public StreamPresetData CurrentStreamPreset
+        {
+            get => _currentStreamPreset;
+            set
+            {
+                if (_currentStreamPreset == value) return;
+                _currentStreamPreset = value;
+                CurrentStreamPresetChanged?.Invoke(this, value);
+            }
+        }
 
         public string StreamUrl
         {
@@ -50,7 +64,7 @@ namespace CinemaModule.Settings
 
         public string CurrentTwitchChannel
         {
-            get => _data.CurrentTwitchChannel ?? "";
+            get => _data.CurrentTwitchChannel;
             set
             {
                 var normalizedValue = value ?? "";
@@ -80,20 +94,20 @@ namespace CinemaModule.Settings
 
         public string SelectedPresetLocationId
         {
-            get => _data.SelectedPresetLocationId ?? "";
-            set { _data.SelectedPresetLocationId = value; Save(); }
+            get => _data.SelectedPresetLocationId;
+            set => SetProperty(_data.SelectedPresetLocationId, value, v => _data.SelectedPresetLocationId = v);
         }
 
         public string SelectedSavedLocationId
         {
             get => _data.SelectedSavedLocationId;
-            set { _data.SelectedSavedLocationId = value; Save(); }
+            set => SetProperty(_data.SelectedSavedLocationId, value, v => _data.SelectedSavedLocationId = v);
         }
 
         public WorldPosition3D WorldPosition
         {
             get => _data.WorldPosition;
-            set { _data.WorldPosition = value; Save(); RaiseEvent(WorldPositionChanged, value); }
+            set => SetPropertyWithEvent(_data.WorldPosition, value, v => _data.WorldPosition = v, WorldPositionChanged);
         }
 
         public float WorldScreenWidth
@@ -114,13 +128,19 @@ namespace CinemaModule.Settings
         public Point WindowPosition
         {
             get => _data.WindowPosition;
-            set { _data.WindowPosition = value; Save(); }
+            set => SetProperty(_data.WindowPosition, value, v => _data.WindowPosition = v);
         }
 
         public Point WindowSize
         {
             get => _data.WindowSize;
-            set { _data.WindowSize = value; Save(); }
+            set => SetProperty(_data.WindowSize, value, v => _data.WindowSize = v);
+        }
+
+        public bool WindowLocked
+        {
+            get => _data.WindowLocked;
+            set => SetProperty(_data.WindowLocked, value, v => _data.WindowLocked = v);
         }
 
         public SavedLocationCollection SavedLocations => _data.SavedLocations;
@@ -130,7 +150,55 @@ namespace CinemaModule.Settings
         public string SelectedSavedStreamId
         {
             get => _data.SelectedSavedStreamId;
-            set { _data.SelectedSavedStreamId = value; Save(); }
+            set => SetProperty(_data.SelectedSavedStreamId, value, v => _data.SelectedSavedStreamId = v);
+        }
+
+        public string TwitchAccessToken
+        {
+            get => _data.TwitchAccessToken;
+            set => SetProperty(_data.TwitchAccessToken, value, v => _data.TwitchAccessToken = v);
+        }
+
+        public string TwitchRefreshToken
+        {
+            get => _data.TwitchRefreshToken;
+            set => SetProperty(_data.TwitchRefreshToken, value, v => _data.TwitchRefreshToken = v);
+        }
+
+        public string LastSelectedSourceCategory
+        {
+            get => _data.LastSelectedSourceCategory;
+            set => SetProperty(_data.LastSelectedSourceCategory, value, v => _data.LastSelectedSourceCategory = v);
+        }
+
+        public int SelectedSettingsTab
+        {
+            get => _data.SelectedSettingsTab;
+            set => SetProperty(_data.SelectedSettingsTab, value, v => _data.SelectedSettingsTab = v);
+        }
+
+        public bool TwitchChatWindowLocked
+        {
+            get => _data.TwitchChatWindowLocked;
+            set => SetProperty(_data.TwitchChatWindowLocked, value, v => _data.TwitchChatWindowLocked = v);
+        }
+
+        public bool TwitchChatWindowOpen
+        {
+            get => _data.TwitchChatWindowOpen;
+            set => SetProperty(_data.TwitchChatWindowOpen, value, v => _data.TwitchChatWindowOpen = v);
+        }
+
+        public Point TwitchChatWindowSize
+        {
+            get => _data.TwitchChatWindowSize;
+            set => SetProperty(_data.TwitchChatWindowSize, value, v => _data.TwitchChatWindowSize = v);
+        }
+
+        public string TwitchChatWindowChannel
+        {
+            get => _data.TwitchChatWindowChannel;
+            set => SetProperty(_data.TwitchChatWindowChannel, value ?? "", v => _data.TwitchChatWindowChannel = v);
         }
 
         #endregion
@@ -165,17 +233,14 @@ namespace CinemaModule.Settings
         public bool DeleteSavedLocation(string id)
         {
             var removed = SavedLocations.Locations.RemoveAll(l => l.Id == id) > 0;
-            if (removed)
-            {
-                if (SelectedSavedLocationId == id)
-                {
-                    _data.SelectedSavedLocationId = "";
-                }
-                Save();
-                RaiseEvent(SavedLocationsChanged);
-                return true;
-            }
-            return false;
+            if (!removed)
+                return false;
+
+            if (SelectedSavedLocationId == id)
+                _data.SelectedSavedLocationId = "";
+            Save();
+            RaiseEvent(SavedLocationsChanged);
+            return true;
         }
 
         public SavedStream AddSavedStream(string name, StreamSourceType sourceType, string value)
@@ -211,21 +276,50 @@ namespace CinemaModule.Settings
             return removed;
         }
 
-        public string GetCurrentTwitchChannel()
+        public void SelectTwitchChannel(string channelName)
         {
-            return string.IsNullOrEmpty(CurrentTwitchChannel) ? null : CurrentTwitchChannel;
+            SelectedSavedStreamId = "";
+            CurrentTwitchChannel = channelName;
+            CurrentStreamSourceType = StreamSourceType.TwitchChannel;
+            CurrentStreamPreset = null;
+        }
+
+        public void SelectUrlChannel(ChannelData channel)
+        {
+            SelectedSavedStreamId = "";
+            CurrentTwitchChannel = "";
+            CurrentStreamSourceType = StreamSourceType.Url;
+            CurrentStreamPreset = channel.IsRadio ? channel.ToStreamPresetData() : null;
+            StreamUrl = channel.Url;
+        }
+
+        public void SelectSavedStream(SavedStream stream)
+        {
+            SelectedSavedStreamId = stream.Id;
+            CurrentStreamSourceType = stream.SourceType;
+            CurrentTwitchChannel = stream.SourceType == StreamSourceType.TwitchChannel ? stream.Value : "";
+            if (stream.SourceType == StreamSourceType.Url)
+                StreamUrl = stream.Value;
+            CurrentStreamPreset = null;
         }
 
         #endregion
 
         #region Private Methods
 
-        private bool SetPropertyWithEvent<T>(T currentValue, T newValue, Action<T> setter, EventHandler<T> eventHandler)
+        private bool SetProperty<T>(T currentValue, T newValue, Action<T> setter)
         {
             if (Equals(currentValue, newValue))
                 return false;
             setter(newValue);
             Save();
+            return true;
+        }
+
+        private bool SetPropertyWithEvent<T>(T currentValue, T newValue, Action<T> setter, EventHandler<T> eventHandler)
+        {
+            if (!SetProperty(currentValue, newValue, setter))
+                return false;
             RaiseEvent(eventHandler, newValue);
             return true;
         }
@@ -234,9 +328,25 @@ namespace CinemaModule.Settings
 
         private void RaiseEvent(EventHandler eventHandler) => eventHandler?.Invoke(this, EventArgs.Empty);
 
-        private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
+        private static T Clamp<T>(T value, T min, T max) where T : IComparable<T>
+        {
+            if (value.CompareTo(min) < 0) return min;
+            if (value.CompareTo(max) > 0) return max;
+            return value;
+        }
 
-        private static float Clamp(float value, float min, float max) => Math.Max(min, Math.Min(max, value));
+        private void MigrateTwitchChannelFromSelectedStream()
+        {
+            if (!string.IsNullOrEmpty(_data.CurrentTwitchChannel) || string.IsNullOrEmpty(_data.SelectedSavedStreamId))
+                return;
+
+            var selectedStream = _data.SavedStreams.Streams.Find(s => s.Id == _data.SelectedSavedStreamId);
+            if (selectedStream != null && selectedStream.SourceType == StreamSourceType.TwitchChannel)
+            {
+                _data.CurrentTwitchChannel = selectedStream.Value;
+                Save();
+            }
+        }
 
         private void Load()
         {
@@ -248,24 +358,11 @@ namespace CinemaModule.Settings
                     _data = JsonConvert.DeserializeObject<CinemaUserSettingsData>(json) 
                         ?? new CinemaUserSettingsData();
                     
-                    // Ensure collections are initialized (handles legacy data without these fields)
-                    _data.SavedLocations = _data.SavedLocations ?? new SavedLocationCollection();
-                    _data.SavedStreams = _data.SavedStreams ?? new SavedStreamCollection();
-                    _data.WorldPosition = _data.WorldPosition ?? new WorldPosition3D(0, 0, 0, 0);
+                    if (_data.SavedLocations == null) _data.SavedLocations = new SavedLocationCollection();
+                    if (_data.SavedStreams == null) _data.SavedStreams = new SavedStreamCollection();
+                    if (_data.WorldPosition == null) _data.WorldPosition = new WorldPosition3D(0, 0, 0, 0);
                                         
-                    // Ensure CurrentTwitchChannel is populated from selected stream if empty
-                    if (string.IsNullOrEmpty(_data.CurrentTwitchChannel) && !string.IsNullOrEmpty(_data.SelectedSavedStreamId))
-                    {
-                        var selectedStream = _data.SavedStreams?.Streams.Find(s => s.Id == _data.SelectedSavedStreamId);
-                        if (selectedStream != null && selectedStream.SourceType == StreamSourceType.TwitchChannel)
-                        {
-                            _data.CurrentTwitchChannel = selectedStream.Value;
-                            Save();
-                            Logger.Debug($"Populated CurrentTwitchChannel from selected stream: {selectedStream.Value}");
-                        }
-                    }
-                    
-                    Logger.Info("Loaded CinemaHUD settings from JSON");
+                    MigrateTwitchChannelFromSelectedStream();
                 }
                 catch (Exception ex)
                 {
@@ -317,7 +414,16 @@ namespace CinemaModule.Settings
         public float WorldScreenWidth { get; set; } = 10f;
         public Point WindowPosition { get; set; } = new Point(100, 50);
         public Point WindowSize { get; set; } = new Point(640, 360);
+        public bool WindowLocked { get; set; }
         public SavedLocationCollection SavedLocations { get; set; } = new SavedLocationCollection();
         public SavedStreamCollection SavedStreams { get; set; } = new SavedStreamCollection();
+        public string TwitchAccessToken { get; set; }
+        public string TwitchRefreshToken { get; set; }
+        public string LastSelectedSourceCategory { get; set; }
+        public int SelectedSettingsTab { get; set; }
+        public bool TwitchChatWindowLocked { get; set; }
+        public bool TwitchChatWindowOpen { get; set; }
+        public Point TwitchChatWindowSize { get; set; } = new Point(439, 514);
+        public string TwitchChatWindowChannel { get; set; } = "";
     }
 }

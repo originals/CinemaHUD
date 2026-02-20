@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Blish_HUD;
 
-namespace CinemaModule.Player
+namespace CinemaModule.VideoPlayer
 {
     /// <summary>
     /// Handles LibVLC video format negotiation callbacks.

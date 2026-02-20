@@ -2,7 +2,7 @@ using Blish_HUD;
 using System;
 using System.Runtime.InteropServices;
 
-namespace CinemaModule.Player
+namespace CinemaModule.VideoPlayer
 {
     internal class VideoCallbackHandler
     {

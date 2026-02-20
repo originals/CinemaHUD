@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using CinemaModule.Services;
@@ -7,11 +9,16 @@ namespace CinemaModule.UI.Windows.Info
 {
     public class ThirdPartyNoticesWindow : StandardWindow
     {
+        private const string NoticesFileName = "THIRD-PARTY-NOTICES.txt";
+        private const int LineHeight = 14;
+        private const int HeightPadding = 50;
+        private const int ContentPadding = 5;
+
         private Panel _scrollPanel;
         private MultilineTextBox _noticesTextBox;
 
         public ThirdPartyNoticesWindow()
-                         : base(CinemaModule.Instance.TextureService.GetSmallWindowBackground(), new Rectangle(25, 26, 435, 480),
+            : base(CinemaModule.Instance.TextureService.GetSmallWindowBackground(), new Rectangle(25, 26, 435, 480),
                 new Rectangle(40, 10, 395, 440))
         {
             Parent = GameService.Graphics.SpriteScreen;
@@ -29,7 +36,7 @@ namespace CinemaModule.UI.Windows.Info
             _scrollPanel = new Panel
             {
                 Parent = this,
-                Location = new Point(0, 0),
+                Location = Point.Zero,
                 Size = new Point(ContentRegion.Width, ContentRegion.Height),
                 CanScroll = true
             };
@@ -40,9 +47,9 @@ namespace CinemaModule.UI.Windows.Info
             _noticesTextBox = new MultilineTextBox
             {
                 Parent = _scrollPanel,
-                Location = new Point(5, 5),
+                Location = new Point(ContentPadding, ContentPadding),
                 Width = _scrollPanel.ContentRegion.Width,
-                Height = lines.Length * 14 + 50,
+                Height = lines.Length * LineHeight + HeightPadding,
                 Text = noticesText,
                 Font = GameService.Content.GetFont(ContentService.FontFace.Menomonia, ContentService.FontSize.Size11, ContentService.FontStyle.Regular)
             };
@@ -52,20 +59,21 @@ namespace CinemaModule.UI.Windows.Info
         {
             try
             {
-                var stream = CinemaModule.Instance.ContentsManager.GetFileStream("THIRD-PARTY-NOTICES.txt");
-                if (stream == null)
+                using (var stream = CinemaModule.Instance.ContentsManager.GetFileStream(NoticesFileName))
                 {
-                    Logger.GetLogger<ThirdPartyNoticesWindow>().Warn("THIRD-PARTY-NOTICES.txt stream is null");
-                    return "Third-party-notices file not found.";
-                }
+                    if (stream == null)
+                    {
+                        Logger.GetLogger<ThirdPartyNoticesWindow>().Warn($"{NoticesFileName} stream is null");
+                        return "Third-party-notices file not found.";
+                    }
 
-                using (stream)
-                using (var reader = new System.IO.StreamReader(stream))
-                {
-                    return reader.ReadToEnd();
+                    using (var reader = new StreamReader(stream))
+                    {
+                        return reader.ReadToEnd();
+                    }
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Logger.GetLogger<ThirdPartyNoticesWindow>().Warn($"Failed to load third-party-notices: {ex.Message}");
                 return $"Third-party-notices could not be loaded.\nError: {ex.Message}";
@@ -74,8 +82,8 @@ namespace CinemaModule.UI.Windows.Info
 
         protected override void DisposeControl()
         {
-            _noticesTextBox?.Dispose();
-            _scrollPanel?.Dispose();
+            _noticesTextBox.Dispose();
+            _scrollPanel.Dispose();
             base.DisposeControl();
         }
     }

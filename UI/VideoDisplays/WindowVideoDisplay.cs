@@ -9,7 +9,7 @@ using CinemaModule.UI.Controls;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace CinemaModule.UI.Displays
+namespace CinemaModule.UI.VideoDisplays
 {
     public class WindowVideoDisplay : Panel, IVideoDisplay
     {
@@ -51,6 +51,8 @@ namespace CinemaModule.UI.Displays
         public event EventHandler TwitchChatClicked;
         public event EventHandler CloseClicked;
         public event EventHandler<int> QualityChanged;
+        public event EventHandler<float> SeekRequested;
+        public event EventHandler<bool> LockToggled;
 
         #endregion
 
@@ -58,38 +60,64 @@ namespace CinemaModule.UI.Displays
 
         public bool IsPaused
         {
-            get => _controlsOverlay?.IsPaused ?? false;
-            set
-            {
-                if (_controlsOverlay != null)
-                {
-                    _controlsOverlay.IsPaused = value;
-                }
-            }
+            get => _controlsOverlay.IsPaused;
+            set => _controlsOverlay.IsPaused = value;
         }
 
         public int Volume
         {
-            get => _controlsOverlay?.Volume ?? 100;
-            set
-            {
-                if (_controlsOverlay != null)
-                {
-                    _controlsOverlay.Volume = value;
-                }
-            }
+            get => _controlsOverlay.Volume;
+            set => _controlsOverlay.Volume = value;
         }
 
         public bool IsTwitchStream
         {
-            get => _controlsOverlay?.IsTwitchStream ?? false;
-            set
-            {
-                if (_controlsOverlay != null)
-                {
-                    _controlsOverlay.IsTwitchStream = value;
-                }
-            }
+            get => _controlsOverlay.IsTwitchStream;
+            set => _controlsOverlay.IsTwitchStream = value;
+        }
+
+        public bool IsSeekable
+        {
+            get => _controlsOverlay.IsSeekable;
+            set => _controlsOverlay.IsSeekable = value;
+        }
+
+        public float CurrentPosition
+        {
+            get => _controlsOverlay.CurrentPosition;
+            set => _controlsOverlay.CurrentPosition = value;
+        }
+
+        public long Duration
+        {
+            get => _controlsOverlay.Duration;
+            set => _controlsOverlay.Duration = value;
+        }
+
+        public bool IsBuffering { get; set; }
+
+        public bool IsLocked
+        {
+            get => _controlsOverlay.IsLocked;
+            set => _controlsOverlay.IsLocked = value;
+        }
+
+        public string StreamTitle
+        {
+            get => _controlsOverlay.StreamTitle;
+            set => _controlsOverlay.StreamTitle = value;
+        }
+
+        public int? ViewerCount
+        {
+            get => _controlsOverlay.ViewerCount;
+            set => _controlsOverlay.ViewerCount = value;
+        }
+
+        public string GameName
+        {
+            get => _controlsOverlay.GameName;
+            set => _controlsOverlay.GameName = value;
         }
 
         public new Point Size
@@ -99,7 +127,14 @@ namespace CinemaModule.UI.Displays
             {
                 int clampedWidth = Math.Max(MinWidth, Math.Min(value.X, MaxWidth));
                 int calculatedHeight = (int)(clampedWidth / AspectRatio);
-                base.Size = new Point(clampedWidth, calculatedHeight);
+                var newSize = new Point(clampedWidth, calculatedHeight);
+                base.Size = newSize;
+
+                var reclampedLocation = ClampToScreenBounds(base.Location, newSize);
+                if (reclampedLocation != base.Location)
+                {
+                    base.Location = reclampedLocation;
+                }
             }
         }
 
@@ -142,6 +177,8 @@ namespace CinemaModule.UI.Displays
             _controlsOverlay.TwitchChatClicked += (s, e) => TwitchChatClicked?.Invoke(this, EventArgs.Empty);
             _controlsOverlay.CloseClicked += (s, e) => CloseClicked?.Invoke(this, EventArgs.Empty);
             _controlsOverlay.QualityChanged += (s, index) => QualityChanged?.Invoke(this, index);
+            _controlsOverlay.SeekRequested += (s, pos) => SeekRequested?.Invoke(this, pos);
+            _controlsOverlay.LockToggled += (s, locked) => LockToggled?.Invoke(this, locked);
 
             GameService.Input.Mouse.LeftMouseButtonReleased += OnGlobalMouseRelease;
         }
@@ -150,12 +187,6 @@ namespace CinemaModule.UI.Displays
 
         public void UpdateTexture(Texture2D texture)
         {
-            if (_currentTexture == null || _currentTexture.IsDisposed)
-            {
-                _currentTexture = texture;
-                return;
-            }
-
             if (texture == _currentTexture)
             {
                 return;
@@ -180,7 +211,7 @@ namespace CinemaModule.UI.Displays
 
         public void UpdateAvailableQualities(IReadOnlyList<string> qualityNames, int selectedIndex)
         {
-            _controlsOverlay?.UpdateAvailableQualities(qualityNames, selectedIndex);
+            _controlsOverlay.UpdateAvailableQualities(qualityNames, selectedIndex);
         }
 
         #endregion
@@ -208,15 +239,20 @@ namespace CinemaModule.UI.Displays
                     Location.Y + BorderSize,
                     Math.Max(1, Size.X - (BorderSize * 2)),
                     Math.Max(1, Size.Y - (BorderSize * 2)));
-                
+
                 spriteBatch.Draw(_currentTexture, videoRect, Color.White);
+            }
+
+            if (IsBuffering)
+            {
+                DrawBufferingSpinner(spriteBatch, panelRect);
             }
 
             DrawBorder(spriteBatch, panelRect, new Color(80, 80, 80, 210));
             DrawCornerHandles(spriteBatch, panelRect);
 
-            _controlsOverlay?.Update(panelRect);
-            _controlsOverlay?.Draw(spriteBatch);
+            _controlsOverlay.Update(panelRect);
+            _controlsOverlay.Draw(spriteBatch);
         }
 
         private void DrawBorder(SpriteBatch spriteBatch, Rectangle panelRect, Color baseColor)
@@ -245,6 +281,11 @@ namespace CinemaModule.UI.Displays
 
         private void DrawCornerHandles(SpriteBatch spriteBatch, Rectangle panelRect)
         {
+            if (IsLocked)
+            {
+                return;
+            }
+
             var resizeTexture = _isHoveringResizeCorner || _isResizing
                 ? _textureResizeCornerActive
                 : _textureResizeCorner;
@@ -261,6 +302,18 @@ namespace CinemaModule.UI.Displays
             }
         }
 
+        private void DrawBufferingSpinner(SpriteBatch spriteBatch, Rectangle panelRect)
+        {
+            const int SpinnerSize = 64;
+            var spinnerRect = new Rectangle(
+                panelRect.X + (panelRect.Width - SpinnerSize) / 2,
+                panelRect.Y + (panelRect.Height - SpinnerSize) / 2,
+                SpinnerSize,
+                SpinnerSize);
+
+            LoadingSpinnerUtil.DrawLoadingSpinner(this, spriteBatch, spinnerRect);
+        }
+
         protected override void OnLeftMouseButtonPressed(MouseEventArgs e)
         {
             base.OnLeftMouseButtonPressed(e);
@@ -268,6 +321,11 @@ namespace CinemaModule.UI.Displays
             var mousePos = GameService.Input.Mouse.Position;
 
             if (_controlsOverlay != null && _controlsOverlay.HandleMouseDown(mousePos))
+            {
+                return;
+            }
+
+            if (IsLocked)
             {
                 return;
             }
@@ -334,7 +392,7 @@ namespace CinemaModule.UI.Displays
             {
                 var nOffset = GameService.Input.Mouse.Position - _dragStartMouse;
                 var newLocation = ClampToScreenBounds(_dragStartLocation + nOffset, Size);
-                
+
                 if (newLocation != Location)
                 {
                     Location = newLocation;
@@ -345,6 +403,8 @@ namespace CinemaModule.UI.Displays
             {
                 HandleResize(GameService.Input.Mouse.Position);
             }
+
+            BasicTooltipText = _controlsOverlay.CurrentTooltip;
         }
 
         private void HandleResize(Point mousePos)
@@ -409,18 +469,31 @@ namespace CinemaModule.UI.Displays
             }
         }
 
+        private const int MinScreenSize = 480;
+        private const int DefaultScreenWidth = 640;
+        private const int DefaultScreenHeight = 480;
+        private const int ScreenEdgeBuffer = 100;
+
         private Point ClampToScreenBounds(Point location, Point size)
         {
             var screenWidth = GameService.Graphics.SpriteScreen.Width;
             var screenHeight = GameService.Graphics.SpriteScreen.Height;
 
-            if (screenWidth <= 0 || screenHeight <= 0)
+            bool screenNotReady = screenWidth < MinScreenSize || screenHeight < MinScreenSize;
+
+            if (screenNotReady)
             {
-                return location;
+                screenWidth = DefaultScreenWidth;
+                screenHeight = DefaultScreenHeight;
             }
 
-            int clampedX = Math.Max(0, Math.Min(location.X, screenWidth - size.X));
-            int clampedY = Math.Max(TopMargin, Math.Min(location.Y, screenHeight - size.Y));
+            int minX = 0;
+            int minY = TopMargin;
+            int maxX = Math.Max(minX, screenWidth - ScreenEdgeBuffer);
+            int maxY = Math.Max(minY, screenHeight - ScreenEdgeBuffer);
+
+            int clampedX = Math.Max(minX, Math.Min(location.X, maxX));
+            int clampedY = Math.Max(minY, Math.Min(location.Y, maxY));
 
             return new Point(clampedX, clampedY);
         }
@@ -432,7 +505,7 @@ namespace CinemaModule.UI.Displays
         protected override void DisposeControl()
         {
             GameService.Input.Mouse.LeftMouseButtonReleased -= OnGlobalMouseRelease;
-            _controlsOverlay?.Dispose();
+            _controlsOverlay.Dispose();
             base.DisposeControl();
         }
 

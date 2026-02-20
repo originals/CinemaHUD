@@ -18,7 +18,9 @@ namespace CinemaModule.Services
         private static readonly Logger Logger = Logger.GetLogger<TwitchService>();
 
         private const string TwitchGqlUrl = "https://gql.twitch.tv/gql";
-        private const string TwitchClientId = "kimne78kx3ncx6brgo4mv6wki5h1ko"; // oficial twitch client ID 
+        private const string TwitchHelixUrl = "https://api.twitch.tv/helix";
+        private const string TwitchClientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+        private const string TwitchAuthClientId = "8m7h0mxthjx16qofx82mruz640ke67";
         private const string TwitchUsherUrl = "https://usher.ttvnw.net/api/channel/hls";
         private const string AvatarCacheSubfolder = "avatars";
 
@@ -29,30 +31,33 @@ namespace CinemaModule.Services
         private string _cachedQualitiesChannel;
         private int _selectedQualityIndex;
         private bool _isFetchingQualities;
+        private string _authToken;
+        private string _userId;
 
-        /// Raised when quality options have been fetched and are available.
         public event EventHandler<TwitchQualitiesEventArgs> QualitiesChanged;
+        public event EventHandler ScopeError;
 
         public ImageCacheService ImageCache => _imageCache;
+        public bool IsAuthenticated => !string.IsNullOrEmpty(_authToken);
 
         public TwitchService(string cacheDirectory)
         {
             _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Add("Client-ID", TwitchClientId);
 
             var avatarCacheDir = Path.Combine(cacheDirectory, AvatarCacheSubfolder);
             _imageCache = new ImageCacheService(avatarCacheDir, _httpClient);
         }
 
+        public void SetAuthToken(string token, string userId = null)
+        {
+            _authToken = token;
+            _userId = userId;
+        }
+
         public async Task<TwitchStreamInfo> GetStreamInfoAsync(string channelName)
         {
             if (string.IsNullOrWhiteSpace(channelName))
-            {
-                Logger.Warn("GetStreamInfoAsync called with null or empty channel name");
                 return null;
-            }
-
-            Logger.Debug($"Fetching stream info for channel: {channelName}");
 
             try
             {
@@ -76,10 +81,7 @@ namespace CinemaModule.Services
             var result = new Dictionary<string, TwitchStreamInfo>(StringComparer.OrdinalIgnoreCase);
 
             if (channelNames == null || channelNames.Count == 0)
-            {
-                Logger.Debug("GetMultipleStreamInfoAsync called with empty channel list");
                 return result;
-            }
 
             var validChannels = channelNames
                 .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -89,8 +91,6 @@ namespace CinemaModule.Services
 
             if (validChannels.Count == 0)
                 return result;
-
-            Logger.Debug($"Fetching stream info for {validChannels.Count} channels in batch");
 
             try
             {
@@ -109,6 +109,130 @@ namespace CinemaModule.Services
             }
         }
 
+        public async Task<List<TwitchStreamInfo>> GetFollowedChannelsAsync()
+        {
+            if (!IsAuthenticated || string.IsNullOrEmpty(_userId))
+                return new List<TwitchStreamInfo>();
+
+            try
+            {
+                var streams = await GetFollowedLiveStreamsHelixAsync();
+                return streams;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to get followed channels");
+                return new List<TwitchStreamInfo>();
+            }
+        }
+
+        private async Task<List<TwitchStreamInfo>> GetFollowedLiveStreamsHelixAsync()
+        {
+            var url = $"{TwitchHelixUrl}/streams/followed?user_id={_userId}&first=50";
+
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+            {
+                request.Headers.Add("Client-ID", TwitchAuthClientId);
+                request.Headers.Add("Authorization", $"Bearer {_authToken}");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Logger.Warn($"Failed to get followed streams: {error}");
+
+                    if (error.Contains("Missing scope"))
+                    {
+                        Logger.Info("Token missing required scope - triggering re-authentication");
+                        ScopeError?.Invoke(this, EventArgs.Empty);
+                    }
+
+                    return new List<TwitchStreamInfo>();
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JObject.Parse(content);
+
+                var streams = ParseHelixFollowedStreams(json);
+                return await EnrichWithUserAvatars(streams);
+            }
+        }
+
+        private async Task<List<TwitchStreamInfo>> EnrichWithUserAvatars(List<TwitchStreamInfo> streams)
+        {
+            if (streams.Count == 0)
+                return streams;
+
+            var userIds = streams.Select(s => s.UserId).Where(id => !string.IsNullOrEmpty(id)).Distinct().ToList();
+            if (userIds.Count == 0)
+                return streams;
+
+            var url = $"{TwitchHelixUrl}/users?{string.Join("&", userIds.Select(id => $"id={id}"))}";
+
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+            {
+                request.Headers.Add("Client-ID", TwitchAuthClientId);
+                request.Headers.Add("Authorization", $"Bearer {_authToken}");
+
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                    return streams;
+
+                var content = await response.Content.ReadAsStringAsync();
+                var json = JObject.Parse(content);
+                var users = json["data"] as JArray;
+
+                if (users == null)
+                    return streams;
+
+                var avatarMap = new Dictionary<string, string>();
+                foreach (var user in users)
+                {
+                    var id = user["id"]?.ToString();
+                    var avatar = user["profile_image_url"]?.ToString();
+                    if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(avatar))
+                        avatarMap[id] = avatar;
+                }
+
+                foreach (var stream in streams)
+                {
+                    if (!string.IsNullOrEmpty(stream.UserId) && avatarMap.TryGetValue(stream.UserId, out var avatarUrl))
+                        stream.AvatarUrl = avatarUrl;
+                }
+            }
+
+            return streams;
+        }
+
+        private List<TwitchStreamInfo> ParseHelixFollowedStreams(JObject json)
+        {
+            var result = new List<TwitchStreamInfo>();
+            var data = json["data"] as JArray;
+
+            if (data == null)
+                return result;
+
+            foreach (var stream in data)
+            {
+                var login = stream["user_login"]?.ToString();
+                if (string.IsNullOrEmpty(login))
+                    continue;
+
+                result.Add(new TwitchStreamInfo
+                {
+                    ChannelName = login,
+                    UserId = stream["user_id"]?.ToString(),
+                    IsLive = true,
+                    Title = stream["title"]?.ToString(),
+                    GameName = stream["game_name"]?.ToString(),
+                    ViewerCount = stream["viewer_count"]?.Value<int>() ?? 0
+                });
+            }
+
+            return result;
+        }
+
         public async Task<string> GetPlayableStreamUrlAsync(string channelName)
         {
             if (string.IsNullOrWhiteSpace(channelName))
@@ -123,7 +247,6 @@ namespace CinemaModule.Services
                     return null;
                 }
 
-                Logger.Info($"Generated HLS URL for channel: {channelName}");
                 return BuildHlsUrl(channelName, accessToken.Token, accessToken.Signature);
             }
             catch (Exception ex)
@@ -166,26 +289,20 @@ namespace CinemaModule.Services
                 return;
 
             if (string.IsNullOrWhiteSpace(channelName))
-            {
-                Logger.Debug("Cannot fetch Twitch qualities - no channel name");
                 return;
-            }
 
             _isFetchingQualities = true;
-            Logger.Info($"Fetching Twitch qualities for channel: {channelName}");
 
             try
             {
                 var qualities = await GetStreamQualitiesAsync(channelName);
 
-                if (qualities != null && qualities.Count > 0)
+                if (qualities.Count > 0)
                 {
                     _cachedQualities = qualities;
                     _cachedQualitiesChannel = channelName;
                     _selectedQualityIndex = 0;
 
-                    Logger.Info($"Cached {_cachedQualities.Count} Twitch quality options for {channelName}");
-                    
                     var qualityNames = _cachedQualities.Select(q => q.DisplayName).ToList();
                     QualitiesChanged?.Invoke(this, new TwitchQualitiesEventArgs(qualityNames, _selectedQualityIndex));
                 }
@@ -214,8 +331,7 @@ namespace CinemaModule.Services
 
             _selectedQualityIndex = qualityIndex;
             var selectedQuality = _cachedQualities[qualityIndex];
-            
-            Logger.Info($"Twitch quality selected: {selectedQuality.DisplayName}");
+
             return selectedQuality.StreamUrl;
         }
 
@@ -300,11 +416,7 @@ namespace CinemaModule.Services
 
                 var displayName = BuildQualityDisplayName(isAudioOnly, isSource, height, frameRate, name);
 
-                qualities.Add(new TwitchStreamQuality 
-                { 
-                    DisplayName = displayName,
-                    StreamUrl = streamUrl
-                });
+                qualities.Add(new TwitchStreamQuality(displayName, streamUrl));
             }
 
             qualities = qualities
@@ -352,7 +464,8 @@ namespace CinemaModule.Services
             Logger.Debug($"Requesting PlaybackAccessToken for channel: {channelName}");
 
             var query = BuildPlaybackAccessTokenQuery(channelName);
-            var json = await ExecuteGqlRequestAsync(query, "PlaybackAccessToken");
+            // Use auth token for PlaybackAccessToken to get ad-free streams for subscribers
+            var json = await ExecuteGqlRequestAsync(query, "PlaybackAccessToken", useAuth: true);
 
             if (json == null)
                 return null;
@@ -394,7 +507,6 @@ namespace CinemaModule.Services
             }
 
             var chatUrl = $"https://www.twitch.tv/popout/{channelName.ToLowerInvariant()}/chat?popout=";
-            Logger.Info($"Opening Twitch chat for channel: {channelName}");
 
             try
             {
@@ -431,9 +543,8 @@ namespace CinemaModule.Services
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Logger.Debug($"URL check failed for {url}: {ex.Message}");
                 return new UrlAvailabilityResult { IsAvailable = null, StatusMessage = "Unknown" };
             }
         }
@@ -525,12 +636,27 @@ namespace CinemaModule.Services
             };
         }
 
-        private async Task<JObject> ExecuteGqlRequestAsync(JObject query, string operationName)
+        private Task<JObject> ExecuteGqlRequestAsync(JObject query, string operationName)
+        {
+            return ExecuteGqlRequestAsync(query, operationName, useAuth: false);
+        }
+
+        private async Task<JObject> ExecuteGqlRequestAsync(JObject query, string operationName, bool useAuth)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, TwitchGqlUrl)
             {
                 Content = new StringContent(query.ToString(), Encoding.UTF8, "application/json")
             };
+
+            // Always include Client-ID for GQL requests
+            request.Headers.Add("Client-ID", TwitchClientId);
+
+            // Use Bearer token format for GQL API authentication
+            if (useAuth && !string.IsNullOrEmpty(_authToken))
+            {
+                request.Headers.Add("Authorization", $"Bearer {_authToken}");
+                Logger.Debug($"GQL {operationName} using auth");
+            }
 
             var response = await _httpClient.SendAsync(request);
             Logger.Debug($"GQL {operationName} response status: {response.StatusCode}");

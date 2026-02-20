@@ -1,7 +1,7 @@
 using CinemaModule.Models;
 using Microsoft.Xna.Framework;
 
-namespace CinemaModule.UI.Displays.Rendering
+namespace CinemaModule.UI.VideoDisplays.Rendering
 {
     public class ScreenCornerCalculator
     {

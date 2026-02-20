@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace CinemaModule.Player
+namespace CinemaModule.VideoPlayer
 {
     public class VideoQuality
     {

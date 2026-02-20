@@ -24,7 +24,10 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
                 (GameService.Graphics.SpriteScreen.Height - Height) / 2);
             SavesPosition = false;
             CanResize = false;
+        }
 
+        protected void Initialize()
+        {
             BuildContent();
         }
 

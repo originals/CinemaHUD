@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace CinemaModule.UI.Displays
+namespace CinemaModule.UI.VideoDisplays
 {
     public interface IVideoDisplay : IDisposable
     {
@@ -11,6 +11,14 @@ namespace CinemaModule.UI.Displays
         int Volume { get; set; }
 
         bool IsTwitchStream { get; set; }
+
+        bool IsSeekable { get; set; }
+
+        float CurrentPosition { get; set; }
+
+        long Duration { get; set; }
+
+        bool IsBuffering { get; set; }
 
         void UpdateTexture(Texture2D texture);
 
@@ -27,5 +35,7 @@ namespace CinemaModule.UI.Displays
         event EventHandler TwitchChatClicked;
 
         event EventHandler CloseClicked;
+
+        event EventHandler<float> SeekRequested;
     }
 }

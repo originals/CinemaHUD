@@ -1,5 +1,3 @@
-using Blish_HUD;
-using Blish_HUD.Controls;
 using Blish_HUD.Settings;
 using CinemaModule.UI.Windows.Info;
 
@@ -19,8 +17,6 @@ namespace CinemaModule.Settings
 
         private ThirdPartyNoticesWindow _thirdPartyNoticesWindow;
 
-        private bool _isShowingNotices = false;
-
         public CinemaSettings(SettingCollection settings)
         {
             EnabledSetting = settings.DefineSetting(
@@ -28,29 +24,9 @@ namespace CinemaModule.Settings
                 false,
                 () => "Enable Cinema",
                 () => "Toggle the CinemaHUD video player on or off");
-
-            var buttonSetting = settings.DefineSetting(
-                "ShowThirdPartyNotices",
-                false,
-                () => "Third-Party Notices",
-                () => "View third-party software notices and licenses");
-
-            buttonSetting.SettingChanged += (s, e) =>
-            {
-                if (e.NewValue && !_isShowingNotices)
-                {
-                    _isShowingNotices = true;
-                    ShowThirdPartyNotices();
-                    _isShowingNotices = false;
-                }
-                else if (!e.NewValue && _isShowingNotices)
-                {
-                    _isShowingNotices = false;
-                }
-            };
         }
 
-        private void ShowThirdPartyNotices()
+        public void ShowThirdPartyNotices()
         {
             if (_thirdPartyNoticesWindow == null)
             {

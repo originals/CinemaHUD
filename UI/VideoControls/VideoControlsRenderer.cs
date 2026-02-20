@@ -1,15 +1,18 @@
 using Blish_HUD;
 using Blish_HUD.Content;
-using Blish_HUD.Controls;
 using CinemaModule.Services;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGame.Extended.BitmapFonts;
 
 namespace CinemaModule.UI.Controls
 {
     public class VideoControlsRenderer
     {
         #region Fields
+
+        private const int IconPadding = 4;
+        private const int CloseIconOffset = 3;
 
         private readonly TextureService _textureService;
         private readonly AsyncTexture2D _playTexture;
@@ -21,7 +24,9 @@ namespace CinemaModule.UI.Controls
         private readonly AsyncTexture2D _settingsBgTexture;
         private readonly AsyncTexture2D _twitchChatIconTexture;
         private readonly AsyncTexture2D _closeIconTexture;
-        private readonly AsyncTexture2D _qualityIconTexture;
+        private readonly AsyncTexture2D _seekBarBgTexture;
+        private readonly AsyncTexture2D _lockIconTexture;
+        private readonly AsyncTexture2D _lockActiveIconTexture;
 
         #endregion
 
@@ -36,8 +41,10 @@ namespace CinemaModule.UI.Controls
             _settingsBgTexture = _textureService.GetSettingsBackground();
             _twitchChatIconTexture = _textureService.GetTwitchChatIcon();
             _closeIconTexture = _textureService.GetCloseIcon();
-            _qualityIconTexture = _textureService.GetQualityIcon();
             _volumeBgTexture = _textureService.GetVolumeBackground();
+            _seekBarBgTexture = _textureService.GetSeekBarBackground();
+            _lockIconTexture = _textureService.GetLockIcon();
+            _lockActiveIconTexture = _textureService.GetLockActiveIcon();
         }
 
         #region Public Methods
@@ -59,40 +66,16 @@ namespace CinemaModule.UI.Controls
 
             if (drawBackground)
             {
-                if (_textureService.IsTextureReady(_settingsBgTexture))
-                {
-                    var bgColor = ApplyOpacity(Color.White, opacity);
-                    spriteBatch.Draw(_settingsBgTexture, bounds, bgColor);
-                }
-
-                int iconPadding = 4;
-                iconBounds = new Rectangle(
-                    bounds.X + iconPadding,
-                    bounds.Y + iconPadding,
-                    bounds.Width - iconPadding * 2,
-                    bounds.Height - iconPadding * 2);
+                DrawBackground(spriteBatch, _settingsBgTexture, bounds, opacity);
+                iconBounds = GetPaddedIconBounds(bounds, IconPadding);
             }
             else
             {
                 iconBounds = bounds;
             }
 
-            var iconColor = GetIconColor(isHovering, opacity);
-
-            if (isPaused)
-            {
-                if (_textureService.IsTextureReady(_playTexture))
-                {
-                    spriteBatch.Draw(_playTexture, iconBounds, iconColor);
-                }
-            }
-            else
-            {
-                if (_textureService.IsTextureReady(_pauseTexture))
-                {
-                    spriteBatch.Draw(_pauseTexture, iconBounds, iconColor);
-                }
-            }
+            var texture = isPaused ? _playTexture : _pauseTexture;
+            DrawIcon(spriteBatch, texture, iconBounds, isHovering, opacity);
         }
 
         public void DrawVolumeIcon(
@@ -102,11 +85,7 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            var texture = GetVolumeTexture(volume);
-            if (!_textureService.IsTextureReady(texture)) return;
-
-            var iconColor = GetIconColor(isHovering, opacity);
-            spriteBatch.Draw(texture, bounds, iconColor);
+            DrawIcon(spriteBatch, GetVolumeTexture(volume), bounds, isHovering, opacity);
         }
 
         public void DrawVolumeIconWithBackground(
@@ -117,12 +96,7 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            if (_textureService.IsTextureReady(_volumeBgTexture))
-            {
-                var bgColor = ApplyOpacity(Color.White, opacity);
-                spriteBatch.Draw(_volumeBgTexture, backgroundBounds, bgColor);
-            }
-
+            DrawBackground(spriteBatch, _volumeBgTexture, backgroundBounds, opacity);
             DrawVolumeIcon(spriteBatch, iconBounds, volume, isHovering, opacity);
         }
 
@@ -132,24 +106,7 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            if (_textureService.IsTextureReady(_settingsBgTexture))
-            {
-                var bgColor = ApplyOpacity(Color.White, opacity);
-                spriteBatch.Draw(_settingsBgTexture, bounds, bgColor);
-            }
-
-            if (_textureService.IsTextureReady(_settingsIconTexture))
-            {
-                int iconPadding = 4;
-                var iconBounds = new Rectangle(
-                    bounds.X + iconPadding,
-                    bounds.Y + iconPadding,
-                    bounds.Width - iconPadding * 2,
-                    bounds.Height - iconPadding * 2);
-
-                var iconColor = GetIconColor(isHovering, opacity);
-                spriteBatch.Draw(_settingsIconTexture, iconBounds, iconColor);
-            }
+            DrawIconWithBackground(spriteBatch, _settingsIconTexture, bounds, isHovering, opacity);
         }
 
         public void DrawSettingsIconOnly(
@@ -158,11 +115,7 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            if (_textureService.IsTextureReady(_settingsIconTexture))
-            {
-                var iconColor = GetIconColor(isHovering, opacity);
-                spriteBatch.Draw(_settingsIconTexture, bounds, iconColor);
-            }
+            DrawIcon(spriteBatch, _settingsIconTexture, bounds, isHovering, opacity);
         }
 
         public void DrawTwitchChatIconOnly(
@@ -171,11 +124,7 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            if (_textureService.IsTextureReady(_twitchChatIconTexture))
-            {
-                var iconColor = GetIconColor(isHovering, opacity);
-                spriteBatch.Draw(_twitchChatIconTexture, bounds, iconColor);
-            }
+            DrawIcon(spriteBatch, _twitchChatIconTexture, bounds, isHovering, opacity);
         }
 
         public void DrawTwitchChatButton(
@@ -184,24 +133,7 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            if (_textureService.IsTextureReady(_settingsBgTexture))
-            {
-                var bgColor = ApplyOpacity(Color.White, opacity);
-                spriteBatch.Draw(_settingsBgTexture, bounds, bgColor);
-            }
-
-            if (_textureService.IsTextureReady(_twitchChatIconTexture))
-            {
-                int iconPadding = 4;
-                var iconBounds = new Rectangle(
-                    bounds.X + iconPadding,
-                    bounds.Y + iconPadding,
-                    bounds.Width - iconPadding * 2,
-                    bounds.Height - iconPadding * 2);
-
-                var iconColor = GetIconColor(isHovering, opacity);
-                spriteBatch.Draw(_twitchChatIconTexture, iconBounds, iconColor);
-            }
+            DrawIconWithBackground(spriteBatch, _twitchChatIconTexture, bounds, isHovering, opacity);
         }
 
         public void DrawCloseButton(
@@ -210,48 +142,142 @@ namespace CinemaModule.UI.Controls
             bool isHovering,
             float opacity)
         {
-            if (_textureService.IsTextureReady(_settingsBgTexture))
-            {
-                var bgColor = ApplyOpacity(Color.White, opacity);
-                spriteBatch.Draw(_settingsBgTexture, bounds, bgColor);
-            }
+            DrawBackground(spriteBatch, _settingsBgTexture, bounds, opacity);
 
-            if (_textureService.IsTextureReady(_closeIconTexture))
-            {
-                int iconPadding = 4;
-                var iconBounds = new Rectangle(
-                    bounds.X + iconPadding -3,
-                    bounds.Y + iconPadding - 3,
-                    bounds.Width - (iconPadding - 3) * 2,
-                    bounds.Height - (iconPadding - 3) * 2);
+            if (!_textureService.IsTextureReady(_closeIconTexture)) return;
 
-                var iconColor = GetIconColor(isHovering, opacity);
+            int adjustedPadding = IconPadding - CloseIconOffset;
+            var iconBounds = GetPaddedIconBounds(bounds, adjustedPadding);
+            var iconColor = GetIconColor(isHovering, opacity);
 
-                //  plus icon so, rotate by 45 degrees to get a cross
-                float rotation = MathHelper.ToRadians(45);
-                var origin = new Vector2(_closeIconTexture.Width / 2f, _closeIconTexture.Height / 2f);
-                var position = new Vector2(
-                    iconBounds.X + iconBounds.Width / 2f,
-                    iconBounds.Y + iconBounds.Height / 2f);
-                var scale = new Vector2(
-                    iconBounds.Width / (float)_closeIconTexture.Width,
-                    iconBounds.Height / (float)_closeIconTexture.Height);
+            float rotation = MathHelper.ToRadians(45);
+            var origin = new Vector2(_closeIconTexture.Width / 2f, _closeIconTexture.Height / 2f);
+            var position = new Vector2(
+                iconBounds.X + iconBounds.Width / 2f,
+                iconBounds.Y + iconBounds.Height / 2f);
+            var scale = new Vector2(
+                iconBounds.Width / (float)_closeIconTexture.Width,
+                iconBounds.Height / (float)_closeIconTexture.Height);
 
-                spriteBatch.Draw(
-                    _closeIconTexture,
-                    position,
-                    null,
-                    iconColor,
-                    rotation,
-                    origin,
-                    scale,
-                    SpriteEffects.None,
-                    0f);
+            spriteBatch.Draw(
+                _closeIconTexture,
+                position,
+                null,
+                iconColor,
+                rotation,
+                origin,
+                scale,
+                SpriteEffects.None,
+                0f);
+        }
 
-            }
+        public void DrawTimeText(
+            SpriteBatch spriteBatch,
+            string timeText,
+            Rectangle bounds,
+            float opacity)
+        {
+            var font = GameService.Content.DefaultFont14;
+            if (font == null) return;
+
+            var textColor = ApplyOpacity(Color.White, opacity);
+            var textSize = font.MeasureString(timeText);
+            var textPos = new Vector2(
+                bounds.X + (bounds.Width - textSize.Width) / 2,
+                bounds.Y + (bounds.Height - textSize.Height) / 2);
+
+            spriteBatch.DrawString(font, timeText, textPos, textColor);
+        }
+
+        public void DrawSeekBarBackground(
+            SpriteBatch spriteBatch,
+            Rectangle bounds,
+            float opacity)
+        {
+            DrawBackground(spriteBatch, _seekBarBgTexture, bounds, opacity);
+        }
+
+        public void DrawLockButton(
+            SpriteBatch spriteBatch,
+            Rectangle bounds,
+            bool isLocked,
+            bool isHovering,
+            float opacity)
+        {
+            var texture = isLocked ? _lockActiveIconTexture : _lockIconTexture;
+            DrawIconWithBackground(spriteBatch, texture, bounds, isHovering, opacity);
+        }
+
+        public void DrawStreamInfo(
+            SpriteBatch spriteBatch,
+            Rectangle bounds,
+            string streamTitle,
+            int? viewerCount,
+            string gameName,
+            float opacity)
+        {
+            var font = GameService.Content.DefaultFont16;
+            if (font == null || string.IsNullOrEmpty(streamTitle)) return;
+
+            string displayText = BuildStreamDisplayText(streamTitle, viewerCount, gameName);
+            var textColor = ApplyOpacity(new Color(220, 220, 220), opacity);
+            var textPos = new Vector2(bounds.X, bounds.Y + (bounds.Height - font.LineHeight) / 2f);
+
+            spriteBatch.DrawString(font, displayText, textPos, textColor);
         }
 
         #endregion
+
+        #region Private Methods
+
+        private void DrawBackground(SpriteBatch spriteBatch, AsyncTexture2D texture, Rectangle bounds, float opacity)
+        {
+            if (!_textureService.IsTextureReady(texture)) return;
+
+            var bgColor = ApplyOpacity(Color.White, opacity);
+            spriteBatch.Draw(texture, bounds, bgColor);
+        }
+
+        private void DrawIcon(SpriteBatch spriteBatch, AsyncTexture2D texture, Rectangle bounds, bool isHovering, float opacity)
+        {
+            if (!_textureService.IsTextureReady(texture)) return;
+
+            var iconColor = GetIconColor(isHovering, opacity);
+            spriteBatch.Draw(texture, bounds, iconColor);
+        }
+
+        private void DrawIconWithBackground(SpriteBatch spriteBatch, AsyncTexture2D iconTexture, Rectangle bounds, bool isHovering, float opacity)
+        {
+            DrawBackground(spriteBatch, _settingsBgTexture, bounds, opacity);
+            var iconBounds = GetPaddedIconBounds(bounds, IconPadding);
+            DrawIcon(spriteBatch, iconTexture, iconBounds, isHovering, opacity);
+        }
+
+        private Rectangle GetPaddedIconBounds(Rectangle bounds, int padding)
+        {
+            return new Rectangle(
+                bounds.X + padding,
+                bounds.Y + padding,
+                bounds.Width - padding * 2,
+                bounds.Height - padding * 2);
+        }
+
+        private string BuildStreamDisplayText(string streamTitle, int? viewerCount, string gameName)
+        {
+            string displayText = streamTitle;
+
+            if (!string.IsNullOrEmpty(gameName))
+            {
+                displayText += $" • {gameName}";
+            }
+
+            if (viewerCount.HasValue)
+            {
+                displayText += $" • {viewerCount.Value:N0} viewers";
+            }
+
+            return displayText;
+        }
 
         private Color ApplyOpacity(Color color, float opacity)
         {
@@ -263,6 +289,8 @@ namespace CinemaModule.UI.Controls
             var baseColor = isHovering ? Color.White : new Color(220, 220, 220);
             return ApplyOpacity(baseColor, opacity);
         }
+
+        #endregion
     }
 }
 

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Blish_HUD;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace CinemaModule.Player
+namespace CinemaModule.VideoPlayer
 {
     /// <summary>
     /// Manages the raw video frame buffer for LibVLC callbacks.
