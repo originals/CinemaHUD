@@ -58,6 +58,8 @@ namespace CinemaModule.VideoPlayer
 
         public bool IsPaused => _mediaPlayer?.State == VLCState.Paused;
 
+        public bool IsEnded => _mediaPlayer?.State == VLCState.Ended;
+
         public int Volume
         {
             get => _mediaPlayer?.Volume ?? 0;
@@ -231,6 +233,15 @@ namespace CinemaModule.VideoPlayer
             }
         }
 
+        public void Replay()
+        {
+            if (string.IsNullOrEmpty(_currentUrl))
+                return;
+
+            var url = _currentUrl;
+            Play(url);
+        }
+
         public void TogglePause()
         {
             if (IsPlaying)
@@ -240,6 +251,10 @@ namespace CinemaModule.VideoPlayer
             else if (IsPaused)
             {
                 Resume();
+            }
+            else if (IsEnded)
+            {
+                Replay();
             }
         }
 

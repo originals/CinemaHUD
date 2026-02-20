@@ -18,7 +18,6 @@ namespace CinemaModule.UI.Controls
         private const int TimeDisplayWidth = 90;
         private const int SeekBarWidth = 150;
         private const int VideoControlsOffset = 30;
-        private const int SeekBarBackgroundPadding = 4;
 
         #endregion
 
@@ -496,13 +495,6 @@ namespace CinemaModule.UI.Controls
 
         private void DrawSeekBarSection(SpriteBatch spriteBatch)
         {
-            var seekBarBgRect = new Rectangle(
-                AbsoluteBounds.X + _base.SeekBar.Location.X - SeekBarBackgroundPadding,
-                AbsoluteBounds.Y + _base.SeekBar.Location.Y - SeekBarBackgroundPadding,
-                _base.SeekBar.Size.X + _timeDisplayBounds.Width + BaseVideoControls.ControlSpacing + SeekBarBackgroundPadding * 2,
-                Math.Max(_base.SeekBar.Size.Y, _timeDisplayBounds.Height) + SeekBarBackgroundPadding * 2);
-            _base.Renderer.DrawSeekBarBackground(spriteBatch, seekBarBgRect, Opacity);
-
             var timeRect = new Rectangle(
                 AbsoluteBounds.X + _timeDisplayBounds.X,
                 AbsoluteBounds.Y + _timeDisplayBounds.Y,
