@@ -296,7 +296,7 @@ namespace CinemaModule.Settings
             CurrentTwitchChannel = "";
             SelectedUrlChannelId = channel.Id;
             CurrentStreamSourceType = StreamSourceType.Url;
-            CurrentStreamPreset = channel.IsRadio ? channel.ToStreamPresetData() : null;
+            CurrentStreamPreset = channel.ToStreamPresetData();
             StreamUrl = channel.Url;
         }
 

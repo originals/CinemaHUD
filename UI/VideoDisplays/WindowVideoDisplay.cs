@@ -120,6 +120,10 @@ namespace CinemaModule.UI.VideoDisplays
             set => _controlsOverlay.GameName = value;
         }
 
+        public bool IsOffline { get; set; }
+
+        public Texture2D OfflineTexture { get; set; }
+
         public new Point Size
         {
             get => base.Size;
@@ -232,14 +236,18 @@ namespace CinemaModule.UI.VideoDisplays
 
             spriteBatch.Draw(ContentService.Textures.Pixel, panelRect, new Color(30, 30, 30, 230));
 
-            if (_currentTexture != null && !_currentTexture.IsDisposed)
-            {
-                var videoRect = new Rectangle(
-                    Location.X + BorderSize,
-                    Location.Y + BorderSize,
-                    Math.Max(1, Size.X - (BorderSize * 2)),
-                    Math.Max(1, Size.Y - (BorderSize * 2)));
+            var videoRect = new Rectangle(
+                Location.X + BorderSize,
+                Location.Y + BorderSize,
+                Math.Max(1, Size.X - (BorderSize * 2)),
+                Math.Max(1, Size.Y - (BorderSize * 2)));
 
+            if (IsOffline && OfflineTexture != null && !OfflineTexture.IsDisposed)
+            {
+                DrawOfflineTexture(spriteBatch, videoRect);
+            }
+            else if (_currentTexture != null && !_currentTexture.IsDisposed)
+            {
                 spriteBatch.Draw(_currentTexture, videoRect, Color.White);
             }
 
@@ -253,6 +261,34 @@ namespace CinemaModule.UI.VideoDisplays
 
             _controlsOverlay.Update(panelRect);
             _controlsOverlay.Draw(spriteBatch);
+        }
+
+        private void DrawOfflineTexture(SpriteBatch spriteBatch, Rectangle videoRect)
+        {
+            float textureAspect = (float)OfflineTexture.Width / OfflineTexture.Height;
+            float targetAspect = (float)videoRect.Width / videoRect.Height;
+
+            Rectangle destRect;
+            if (textureAspect > targetAspect)
+            {
+                int height = (int)(videoRect.Width / textureAspect);
+                destRect = new Rectangle(
+                    videoRect.X,
+                    videoRect.Y + (videoRect.Height - height) / 2,
+                    videoRect.Width,
+                    height);
+            }
+            else
+            {
+                int width = (int)(videoRect.Height * textureAspect);
+                destRect = new Rectangle(
+                    videoRect.X + (videoRect.Width - width) / 2,
+                    videoRect.Y,
+                    width,
+                    videoRect.Height);
+            }
+
+            spriteBatch.Draw(OfflineTexture, destRect, Color.White);
         }
 
         private void DrawBorder(SpriteBatch spriteBatch, Rectangle panelRect, Color baseColor)

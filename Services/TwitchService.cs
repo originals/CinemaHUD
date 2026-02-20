@@ -424,7 +424,6 @@ namespace CinemaModule.Services
                 .ThenByDescending(q => ExtractHeightFromDisplayName(q.DisplayName))
                 .ToList();
 
-            Logger.Debug($"Parsed {qualities.Count} quality options from M3U8 playlist");
             return qualities;
         }
 
@@ -461,10 +460,7 @@ namespace CinemaModule.Services
 
         private async Task<StreamAccessToken> GetStreamAccessTokenAsync(string channelName)
         {
-            Logger.Debug($"Requesting PlaybackAccessToken for channel: {channelName}");
-
             var query = BuildPlaybackAccessTokenQuery(channelName);
-            // Use auth token for PlaybackAccessToken to get ad-free streams for subscribers
             var json = await ExecuteGqlRequestAsync(query, "PlaybackAccessToken", useAuth: true);
 
             if (json == null)
@@ -528,7 +524,7 @@ namespace CinemaModule.Services
             try
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Head, url))
-                using (var response = await _httpClient.SendAsync(request))
+                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
                 {
                     return response.IsSuccessStatusCode
                         ? new UrlAvailabilityResult { IsAvailable = true, StatusMessage = "Available" }
@@ -564,7 +560,7 @@ namespace CinemaModule.Services
                             id
                             login
                             displayName
-                            profileImageURL(width: 70)
+                            profileImageURL(width: 600)
                             stream {
                                 id
                                 title
@@ -591,7 +587,7 @@ namespace CinemaModule.Services
                             id
                             login
                             displayName
-                            profileImageURL(width: 70)
+                            profileImageURL(width: 600)
                             stream {
                                 id
                                 title
@@ -648,18 +644,14 @@ namespace CinemaModule.Services
                 Content = new StringContent(query.ToString(), Encoding.UTF8, "application/json")
             };
 
-            // Always include Client-ID for GQL requests
             request.Headers.Add("Client-ID", TwitchClientId);
 
-            // Use Bearer token format for GQL API authentication
             if (useAuth && !string.IsNullOrEmpty(_authToken))
             {
                 request.Headers.Add("Authorization", $"Bearer {_authToken}");
-                Logger.Debug($"GQL {operationName} using auth");
             }
 
             var response = await _httpClient.SendAsync(request);
-            Logger.Debug($"GQL {operationName} response status: {response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -669,8 +661,6 @@ namespace CinemaModule.Services
             }
 
             var content = await response.Content.ReadAsStringAsync();
-            Logger.Debug($"GQL {operationName} response: {content}");
-
             var json = JObject.Parse(content);
             LogGqlErrors(json, operationName);
 
@@ -692,7 +682,6 @@ namespace CinemaModule.Services
 
             if (user == null || user.Type == JTokenType.Null)
             {
-                Logger.Debug($"User not found: {channelName}");
                 return new TwitchStreamInfo
                 {
                     ChannelName = channelName,
@@ -703,7 +692,7 @@ namespace CinemaModule.Services
             var stream = user["stream"];
             bool isLive = stream != null && stream.Type != JTokenType.Null;
 
-            var result = new TwitchStreamInfo
+            return new TwitchStreamInfo
             {
                 ChannelName = channelName,
                 IsLive = isLive,
@@ -712,9 +701,6 @@ namespace CinemaModule.Services
                 ViewerCount = isLive ? stream["viewersCount"]?.Value<int>() ?? 0 : 0,
                 AvatarUrl = user["profileImageURL"]?.ToString()
             };
-
-            Logger.Debug($"Stream info for {channelName}: IsLive={result.IsLive}, Game={result.GameName ?? "N/A"}, Viewers={result.ViewerCount}");
-            return result;
         }
 
         private Dictionary<string, TwitchStreamInfo> ParseMultipleStreamInfo(JObject json, List<string> requestedChannels)
@@ -733,7 +719,7 @@ namespace CinemaModule.Services
                     var stream = user["stream"];
                     bool isLive = stream != null && stream.Type != JTokenType.Null;
 
-                    var streamInfo = new TwitchStreamInfo
+                    result[login] = new TwitchStreamInfo
                     {
                         ChannelName = login,
                         IsLive = isLive,
@@ -742,9 +728,6 @@ namespace CinemaModule.Services
                         ViewerCount = isLive ? stream["viewersCount"]?.Value<int>() ?? 0 : 0,
                         AvatarUrl = user["profileImageURL"]?.ToString()
                     };
-
-                    result[login] = streamInfo;
-                    Logger.Debug($"Stream info for {login}: IsLive={streamInfo.IsLive}, Game={streamInfo.GameName ?? "N/A"}, Viewers={streamInfo.ViewerCount}");
                 }
             }
 
@@ -752,7 +735,6 @@ namespace CinemaModule.Services
             {
                 if (!result.ContainsKey(channelName))
                 {
-                    Logger.Debug($"User not found in batch response: {channelName}");
                     result[channelName] = new TwitchStreamInfo
                     {
                         ChannelName = channelName,
@@ -761,7 +743,6 @@ namespace CinemaModule.Services
                 }
             }
 
-            Logger.Debug($"Parsed stream info for {result.Count} channels");
             return result;
         }
 
@@ -784,7 +765,6 @@ namespace CinemaModule.Services
                 return null;
             }
 
-            Logger.Debug($"PlaybackAccessToken obtained for {channelName}");
             return new StreamAccessToken { Token = token, Signature = signature };
         }
 

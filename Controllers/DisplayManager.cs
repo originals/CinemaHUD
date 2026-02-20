@@ -82,6 +82,9 @@ namespace CinemaModule.Controllers
             if (activeDisplay == null)
                 return;
 
+            if (activeDisplay.IsOffline && activeDisplay.OfflineTexture != null)
+                return;
+
             var preset = _userSettings.CurrentStreamPreset;
             if (preset?.IsRadio == true && preset.StaticImageTexture != null)
             {
@@ -91,6 +94,16 @@ namespace CinemaModule.Controllers
 
             if (_videoPlayer != null)
                 activeDisplay.UpdateTexture(_videoPlayer.VideoTexture);
+        }
+
+        public void UpdateOfflineState(bool isOffline)
+        {
+            ForEachDisplay(d => d.IsOffline = isOffline);
+        }
+
+        public void UpdateOfflineTexture(Texture2D texture)
+        {
+            ForEachDisplay(d => d.OfflineTexture = texture);
         }
 
         public void UpdateDisplayVisibility()

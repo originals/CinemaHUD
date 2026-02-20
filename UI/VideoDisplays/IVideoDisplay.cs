@@ -20,6 +20,10 @@ namespace CinemaModule.UI.VideoDisplays
 
         bool IsBuffering { get; set; }
 
+        bool IsOffline { get; set; }
+
+        Texture2D OfflineTexture { get; set; }
+
         void UpdateTexture(Texture2D texture);
 
         void UpdateAvailableQualities(IReadOnlyList<string> qualityNames, int selectedIndex);

@@ -135,6 +135,10 @@ namespace CinemaModule.UI.VideoDisplays
 
         public bool IsBuffering { get; set; }
 
+        public bool IsOffline { get; set; }
+
+        public Texture2D OfflineTexture { get; set; }
+
         public event EventHandler<float> SeekRequested;
 
         public WorldPosition3D WorldPosition
@@ -532,7 +536,10 @@ namespace CinemaModule.UI.VideoDisplays
 
                 CameraProjection.CreateViewProjectionMatrices(cameraPos, cameraForward, fov, aspectRatio, out var viewMatrix, out var projectionMatrix);
 
-                _renderer.Render(graphicsDevice, viewMatrix, projectionMatrix, _videoTexture, _currentOpacity);
+                var textureToRender = IsOffline && OfflineTexture != null && !OfflineTexture.IsDisposed
+                    ? OfflineTexture
+                    : _videoTexture;
+                _renderer.Render(graphicsDevice, viewMatrix, projectionMatrix, textureToRender, _currentOpacity);
             }
             finally
             {

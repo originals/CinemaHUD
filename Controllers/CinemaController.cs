@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Settings;
 using CinemaModule.Controllers;
@@ -9,6 +10,7 @@ using VideoPlayerClass = CinemaModule.VideoPlayer.VideoPlayer;
 using CinemaModule.Services;
 using CinemaModule.Settings;
 using CinemaModule.UI.VideoDisplays;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace CinemaModule
 {
@@ -21,11 +23,13 @@ namespace CinemaModule
 
         private readonly CinemaSettings _moduleSettings;
         private readonly CinemaUserSettings _userSettings;
+        private readonly TwitchService _twitchService;
 
         private readonly PlaybackController _playbackController;
         private readonly DisplayManager _displayManager;
         private readonly TwitchIntegrationHandler _twitchHandler;
 
+        private TwitchStreamInfo _currentTwitchStreamInfo;
         private bool _isDisposed;
 
         #endregion
@@ -43,6 +47,7 @@ namespace CinemaModule
         {
             _moduleSettings = coreSettings;
             _userSettings = userSettings;
+            _twitchService = twitchService;
 
             _playbackController = new PlaybackController(coreSettings, userSettings, twitchService);
             _displayManager = new DisplayManager(coreSettings, userSettings);
@@ -172,6 +177,7 @@ namespace CinemaModule
             _twitchHandler.StreamInfoUpdated += OnStreamInfoUpdated;
 
             _playbackController.StreamUrlRefreshed += OnStreamUrlRefreshed;
+            _playbackController.PlaybackStateChanged += OnPlaybackStateChanged;
         }
 
         private void SubscribeToSettingsEvents()
@@ -212,6 +218,9 @@ namespace CinemaModule
 
         private void OnStreamUrlChanged(object sender, string url)
         {
+            _displayManager.UpdateOfflineState(false);
+            _displayManager.UpdateOfflineTexture(null);
+            _currentTwitchStreamInfo = null;
             _playbackController.HandleStreamUrlChanged(url);
             _twitchHandler.HandleStreamUrlChanged(IsTwitchStream);
         }
@@ -275,6 +284,7 @@ namespace CinemaModule
 
         private void OnStreamInfoUpdated(object sender, TwitchStreamInfo streamInfo)
         {
+            _currentTwitchStreamInfo = streamInfo;
             if (streamInfo != null)
             {
                 _displayManager.UpdateStreamInfo(streamInfo.ChannelName, streamInfo.ViewerCount, streamInfo.GameName);
@@ -283,6 +293,64 @@ namespace CinemaModule
             {
                 _displayManager.UpdateStreamInfo(null, null, null);
             }
+        }
+
+        private void OnPlaybackStateChanged(object sender, PlaybackState state)
+        {
+            bool isOffline = state == PlaybackState.Stopped || state == PlaybackState.Error || state == PlaybackState.Ended;
+            _displayManager.UpdateOfflineState(isOffline);
+
+            if (isOffline)
+            {
+                _ = LoadOfflineTextureAsync();
+            }
+            else if (state == PlaybackState.Playing)
+            {
+                _displayManager.UpdateOfflineTexture(null);
+            }
+        }
+
+        private async Task LoadOfflineTextureAsync()
+        {
+            Texture2D offlineTexture = IsTwitchStream
+                ? await LoadTwitchAvatarTextureAsync()
+                : await LoadUrlStaticImageTextureAsync();
+
+            if (offlineTexture != null)
+            {
+                _displayManager.UpdateOfflineTexture(offlineTexture);
+            }
+        }
+
+        private async Task<Texture2D> LoadTwitchAvatarTextureAsync()
+        {
+            var channelName = _userSettings.CurrentTwitchChannel;
+            if (string.IsNullOrEmpty(channelName))
+                return null;
+
+            var streamInfo = _currentTwitchStreamInfo ?? await _twitchService.GetStreamInfoAsync(channelName);
+            if (streamInfo == null || string.IsNullOrEmpty(streamInfo.AvatarUrl))
+                return null;
+
+            var avatarTexture = await _twitchService.GetAvatarTextureAsync($"offline_{channelName}", streamInfo.AvatarUrl);
+            return avatarTexture?.Texture;
+        }
+
+        private async Task<Texture2D> LoadUrlStaticImageTextureAsync()
+        {
+            var preset = _userSettings.CurrentStreamPreset;
+            if (preset == null)
+                return null;
+
+            if (preset.StaticImageTexture?.Texture != null && !preset.StaticImageTexture.Texture.IsDisposed)
+                return preset.StaticImageTexture.Texture;
+
+            if (string.IsNullOrEmpty(preset.StaticImage))
+                return null;
+
+            var textureService = CinemaModule.Instance.TextureService;
+            var asyncTexture = await textureService.GetImageFromUrlAsync($"offline_static_{preset.Id}", preset.StaticImage);
+            return asyncTexture?.Texture;
         }
 
         private void OnSeekRequested(object sender, float position)
