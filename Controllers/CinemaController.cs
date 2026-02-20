@@ -189,6 +189,7 @@ namespace CinemaModule
             _userSettings.WorldScreenWidthChanged += OnWorldScreenWidthChanged;
             _userSettings.VolumeChanged += OnVolumeChanged;
             _userSettings.CurrentStreamSourceTypeChanged += OnCurrentStreamSourceTypeChanged;
+            _userSettings.CurrentStreamPresetChanged += OnCurrentStreamPresetChanged;
         }
 
         private void UnsubscribeFromSettingsEvents()
@@ -200,6 +201,7 @@ namespace CinemaModule
             _userSettings.WorldScreenWidthChanged -= OnWorldScreenWidthChanged;
             _userSettings.VolumeChanged -= OnVolumeChanged;
             _userSettings.CurrentStreamSourceTypeChanged -= OnCurrentStreamSourceTypeChanged;
+            _userSettings.CurrentStreamPresetChanged -= OnCurrentStreamPresetChanged;
         }
 
         private void OnEnabledChanged(object sender, ValueChangedEventArgs<bool> e)
@@ -252,6 +254,14 @@ namespace CinemaModule
         {
             _displayManager.UpdateTwitchStreamState(IsTwitchStream);
             _twitchHandler.HandleStreamSourceTypeChanged(sourceType);
+        }
+
+        private void OnCurrentStreamPresetChanged(object sender, StreamPresetData preset)
+        {
+            if (_playbackController.IsOffline)
+            {
+                _ = LoadOfflineTextureAsync();
+            }
         }
 
         private void OnWorldDisplayInRangeChanged(object sender, bool isInRange)
@@ -342,14 +352,15 @@ namespace CinemaModule
             if (preset == null)
                 return null;
 
-            if (preset.StaticImageTexture?.Texture != null && !preset.StaticImageTexture.Texture.IsDisposed)
-                return preset.StaticImageTexture.Texture;
-
             if (string.IsNullOrEmpty(preset.StaticImage))
                 return null;
 
             var textureService = CinemaModule.Instance.TextureService;
             var asyncTexture = await textureService.GetImageFromUrlAsync($"offline_static_{preset.Id}", preset.StaticImage);
+
+            if (asyncTexture != null)
+                preset.StaticImageTexture = asyncTexture;
+
             return asyncTexture?.Texture;
         }
 

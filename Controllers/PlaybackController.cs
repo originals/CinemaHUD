@@ -39,6 +39,10 @@ namespace CinemaModule.Controllers
 
         public bool IsPausedDueToRange => _isPausedDueToRange;
 
+        public bool IsOffline => _videoPlayer == null || 
+            _videoPlayer.IsEnded || 
+            (!_videoPlayer.IsPlaying && !_videoPlayer.IsPaused);
+
         public PlaybackController(CinemaSettings moduleSettings, CinemaUserSettings userSettings, TwitchService twitchService)
         {
             _moduleSettings = moduleSettings;
