@@ -39,6 +39,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private EventHandler _presetsLoadedHandler;
         private EventHandler _savedLocationsChangedHandler;
         private EventHandler<ValueChangedEventArgs<bool>> _enabledSettingChangedHandler;
+        private EventHandler<ResizedEventArgs> _parentResizedHandler;
+        private Container _buildPanel;
 
         #endregion
 
@@ -55,6 +57,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         protected override void Build(Container buildPanel)
         {
+            _buildPanel = buildPanel;
+
             var displaySettingsPanel = new Panel
             {
                 ShowBorder = true,
@@ -91,6 +95,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _settings.SavedLocationsChanged += _savedLocationsChangedHandler;
             _presetsLoadedHandler = (s, e) => RebuildLocationCards();
             _presetService.PresetsLoaded += _presetsLoadedHandler;
+            _parentResizedHandler = (s, e) => UpdateSectionSizes();
+            buildPanel.Resized += _parentResizedHandler;
         }
 
         #endregion
@@ -451,6 +457,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _locationSection.Visible = isEnabled && _settings.DisplayMode == CinemaDisplayMode.InGame;
         }
 
+        private void UpdateSectionSizes()
+        {
+            if (_buildPanel == null || _locationSection == null || _locationsContainer == null) return;
+
+            _locationSection.Size = new Point(_buildPanel.Width - 70, _buildPanel.Height - 280);
+            _locationsContainer.Size = new Point(_locationSection.ContentRegion.Width, _locationSection.ContentRegion.Height - 50);
+        }
+
         private CinemaDisplayMode ParseDisplayMode(string name)
         {
             if (name == "On-Screen Window") return CinemaDisplayMode.OnScreen;
@@ -511,6 +525,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _settings.SavedLocationsChanged -= _savedLocationsChangedHandler;
             _presetService.PresetsLoaded -= _presetsLoadedHandler;
             _cinemaSettings.EnabledSetting.SettingChanged -= _enabledSettingChangedHandler;
+            if (_buildPanel != null)
+            {
+                _buildPanel.Resized -= _parentResizedHandler;
+            }
             _editorWindow?.Dispose();
             _presetInfoWindow?.Dispose();
             base.Unload();

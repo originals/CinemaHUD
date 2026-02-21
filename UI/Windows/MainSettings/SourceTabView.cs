@@ -36,7 +36,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private readonly PresetService _presetService;
 
         private Menu _categoryMenu;
-        private FlowPanel _contentPanel;
+        private Panel _menuPanel;
+        private Panel _contentContainer;
+        private Panel _headerSection;
+        private FlowPanel _cardsPanel;
         private readonly Dictionary<string, ListCard> _streamCards = new Dictionary<string, ListCard>();
         private string _selectedStreamKey;
         private string _selectedCategoryId;
@@ -107,7 +110,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildCategoryMenu(Container parent)
         {
-            var menuPanel = new Panel
+            _menuPanel = new Panel
             {
                 ShowBorder = true,
                 Size = new Point(MenuPanelWidth, parent.Height - 110),
@@ -130,14 +133,15 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             _categoryMenu = new Menu
             {
-                Size = menuPanel.ContentRegion.Size,
+                Size = _menuPanel.ContentRegion.Size,
                 MenuItemHeight = 50,
-                Parent = menuPanel,
+                Parent = _menuPanel,
                 CanSelect = true
             };
 
             PopulateCategoryMenu();
             _categoryMenu.ItemSelected += OnCategorySelected;
+            parent.Resized += OnParentResized;
         }
 
         private void PopulateCategoryMenu()
@@ -161,16 +165,44 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildContentPanel(Container parent)
         {
-            _contentPanel = new FlowPanel
+            _contentContainer = new Panel
             {
-                FlowDirection = ControlFlowDirection.SingleTopToBottom,
                 Size = new Point(parent.Width - MenuPanelWidth - 90, parent.Height - 110),
                 Location = new Point(MenuPanelWidth + 29, 10),
-                ControlPadding = new Vector2(0, CardVerticalSpacing),
-                CanScroll = true,
                 ShowBorder = true,
                 Parent = parent
             };
+
+            _headerSection = new Panel
+            {
+                WidthSizingMode = SizingMode.Fill,
+                Height = 0,
+                Parent = _contentContainer
+            };
+
+            _cardsPanel = new FlowPanel
+            {
+                FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                Size = new Point(_contentContainer.ContentRegion.Width, _contentContainer.ContentRegion.Height),
+                Location = new Point(0, 0),
+                ControlPadding = new Vector2(0, CardVerticalSpacing),
+                CanScroll = true,
+                Parent = _contentContainer
+            };
+        }
+
+        private void OnParentResized(object sender, ResizedEventArgs e)
+        {
+            var parent = (Container)sender;
+            int newHeight = parent.Height - 110;
+            int newWidth = parent.Width - MenuPanelWidth - 90;
+
+            _menuPanel.Height = newHeight;
+            _categoryMenu.Height = _menuPanel.ContentRegion.Height;
+
+            _contentContainer.Size = new Point(newWidth, newHeight);
+            _cardsPanel.Width = _contentContainer.ContentRegion.Width;
+            UpdateCardsPanelLayout();
         }
 
         private void SelectInitialCategory()
@@ -229,13 +261,22 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 _categoryMenu.Select(menuItem);
         }
 
+        private void UpdateCardsPanelLayout()
+        {
+            _cardsPanel.Location = new Point(0, _headerSection.Height);
+            _cardsPanel.Height = _contentContainer.ContentRegion.Height - _headerSection.Height;
+        }
+
         private void RefreshContent()
         {
             _contentCts?.Cancel();
             _contentCts?.Dispose();
             _contentCts = new CancellationTokenSource();
             _streamCards.Clear();
-            _contentPanel.ClearChildren();
+            _headerSection.ClearChildren();
+            _headerSection.Height = 0;
+            _cardsPanel.ClearChildren();
+            UpdateCardsPanelLayout();
 
             if (_selectedCategoryId == CategoryFollowed)
                 LoadFollowedContentAsync(_contentCts.Token);
@@ -278,7 +319,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 {
                     if (token.IsCancellationRequested) return;
                     var key = $"{KeyPrefixFollowed}{stream.ChannelName}";
-                    _cardFactory.CreateFollowedCard(_contentPanel, key, stream, SelectFollowedChannel);
+                    _cardFactory.CreateFollowedCard(_cardsPanel, key, stream, SelectFollowedChannel);
                 }
 
                 _ = LoadFollowedAvatarsAsync(followedStreams, token);
@@ -287,7 +328,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             {
                 if (token.IsCancellationRequested) return;
                 Logger.Warn(ex, "Failed to load followed channels");
-                _contentPanel.ClearChildren();
+                _cardsPanel.ClearChildren();
                 BuildTwitchToolbar();
                 ShowEmptyMessage("Failed to load followed channels");
             }
@@ -320,7 +361,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             foreach (var item in items.OrderByDescending(i => i.IsOnline).ThenByDescending(i => i.ViewerCount))
             {
                 if (token.IsCancellationRequested) return;
-                _cardFactory.CreateTwitchCard(_contentPanel, item, SelectTwitchChannel);
+                _cardFactory.CreateTwitchCard(_cardsPanel, item, SelectTwitchChannel);
             }
 
             _ = LoadAvatarsAsync(items, token);
@@ -350,14 +391,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
             foreach (var item in livestreams)
             {
                 if (token.IsCancellationRequested) return;
-                _cardFactory.CreateChannelCard(_contentPanel, item, SelectChannel);
+                _cardFactory.CreateChannelCard(_cardsPanel, item, SelectChannel);
             }
 
             if (hasBothSections) BuildSectionHeader("On Demand");
             foreach (var item in onDemand)
             {
                 if (token.IsCancellationRequested) return;
-                _cardFactory.CreateChannelCard(_contentPanel, item, SelectChannel);
+                _cardFactory.CreateChannelCard(_cardsPanel, item, SelectChannel);
             }
 
             _ = LoadAvatarsAsync(items, token);
@@ -385,7 +426,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 statusMap.TryGetValue(stream.Id, out var status);
                 var key = GetSavedStreamKey(stream.Id);
                 _cardFactory.CreateCustomCard(
-                    _contentPanel,
+                    _cardsPanel,
                     key,
                     stream,
                     status,
@@ -425,14 +466,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildCenteredLoginButton()
         {
-            _contentPanel.ClearChildren();
-            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 200, Parent = _contentPanel };
+            _cardsPanel.ClearChildren();
+            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 200, Parent = _cardsPanel };
             var loginButton = new StandardButton
             {
                 Text = "Login to Twitch",
                 Width = 160,
                 Height = 40,
-                Left = (_contentPanel.Width - 160) / 2,
+                Left = (_contentContainer.Width - 160) / 2,
                 Top = 80,
                 Parent = container
             };
@@ -441,17 +482,20 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildTwitchToolbar()
         {
-            var toolbar = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _contentPanel };
+            _headerSection.Height = 40;
+            var toolbar = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _headerSection };
             var text = _twitchAuthService.IsAuthenticated && !string.IsNullOrEmpty(_twitchAuthService.Username)
                 ? $"Twitch: {_twitchAuthService.Username}"
                 : "Twitch Login";
             var btn = new StandardButton { Text = text, Width = 140, Left = 5, Top = 5, Parent = toolbar };
             btn.Click += (s, e) => ShowTwitchAuthWindow();
+            UpdateCardsPanelLayout();
         }
 
         private void BuildFollowedHeader(int liveCount)
         {
-            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Height = 50, Parent = _contentPanel };
+            _headerSection.Height = 50;
+            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Height = 50, Parent = _headerSection };
             var username = _twitchAuthService.Username ?? "Unknown";
             var statsText = liveCount > 0
                 ? $"Logged in as {username}  •  {liveCount} followed channels live"
@@ -474,7 +518,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 Text = "Logout",
                 Width = 80,
                 Height = 26,
-                Left = _contentPanel.Width - 110,
+                Left = _contentContainer.Width - 110,
                 Top = 12,
                 Parent = headerPanel
             };
@@ -485,11 +529,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 _settings.TwitchRefreshToken = string.Empty;
                 RefreshContent();
             };
+            UpdateCardsPanelLayout();
         }
 
         private void BuildCustomToolbar()
         {
-            var toolbar = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _contentPanel };
+            _headerSection.Height = 40;
+            var toolbar = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _headerSection };
 
             new Label
             {
@@ -506,11 +552,12 @@ namespace CinemaHUD.UI.Windows.MainSettings
             {
                 Text = "+ Add New",
                 Width = 100,
-                Left = _contentPanel.Width - 110,
+                Left = _contentContainer.Width - 110,
                 Top = 5,
                 Parent = toolbar
             };
             addButton.Click += (s, e) => OpenEditorForNew();
+            UpdateCardsPanelLayout();
         }
 
         private void BuildCategoryHeader(StreamCategory category)
@@ -519,13 +566,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 return;
 
             const int margin = 10;
-            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Parent = _contentPanel };
+            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Parent = _headerSection };
             int contentHeight = 0;
 
             if (!string.IsNullOrEmpty(category.Description))
             {
                 bool hasInfoButton = !string.IsNullOrEmpty(category.InfoUrl);
-                int labelWidth = _contentPanel.Width - (hasInfoButton ? 90 : 40);
+                int labelWidth = _contentContainer.Width - (hasInfoButton ? 90 : 40);
 
                 var descLabel = new Label
                 {
@@ -543,6 +590,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             }
 
             headerPanel.Height = Math.Max(contentHeight + (margin * 2), 46);
+            _headerSection.Height = headerPanel.Height;
 
             if (!string.IsNullOrEmpty(category.InfoUrl))
             {
@@ -552,18 +600,19 @@ namespace CinemaHUD.UI.Windows.MainSettings
                     Text = "Info",
                     Width = 50,
                     Height = 26,
-                    Left = _contentPanel.Width - 80,
+                    Left = _contentContainer.Width - 80,
                     Top = (headerPanel.Height - 26) / 2,
                     Parent = headerPanel,
                     BasicTooltipText = "Open in browser"
                 };
                 infoButton.Click += (s, e) => OpenUrlInBrowser(infoUrl);
             }
+            UpdateCardsPanelLayout();
         }
 
         private void BuildSectionHeader(string title)
         {
-            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Height = 32, Parent = _contentPanel };
+            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Height = 32, Parent = _cardsPanel };
             new Label
             {
                 Text = title,
@@ -579,18 +628,18 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void ShowLoadingSpinner()
         {
-            _contentPanel.ClearChildren();
-            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 100, Parent = _contentPanel };
+            _cardsPanel.ClearChildren();
+            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 100, Parent = _cardsPanel };
             var spinner = new LoadingSpinner { Parent = container };
-            spinner.Left = (_contentPanel.Width - spinner.Width) / 2;
+            spinner.Left = (_contentContainer.Width - spinner.Width) / 2;
             spinner.Top = (container.Height - spinner.Height) / 2;
         }
 
-        private void ReplaceSpinnerWithContent() => _contentPanel.ClearChildren();
+        private void ReplaceSpinnerWithContent() => _cardsPanel.ClearChildren();
 
         private void ShowEmptyMessage(string message)
         {
-            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _contentPanel };
+            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _cardsPanel };
             new Label
             {
                 Text = message,
@@ -816,6 +865,9 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _contentCts?.Dispose();
             _cts?.Cancel();
             _cts?.Dispose();
+
+            if (_contentContainer?.Parent != null)
+                _contentContainer.Parent.Resized -= OnParentResized;
 
             _categoryMenu.ItemSelected -= OnCategorySelected;
             _settings.SavedStreamsChanged -= OnSavedStreamsChanged;

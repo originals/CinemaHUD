@@ -295,11 +295,6 @@ namespace CinemaModule.Controllers
             ForEachDisplay(d => d.CurrentPosition = position);
         }
 
-        public void UpdateBufferingState(bool isBuffering)
-        {
-            ForEachDisplay(d => d.IsBuffering = isBuffering);
-        }
-
         public void UpdateStreamInfo(string title, int? viewerCount, string gameName)
         {
             if (_windowDisplay == null)

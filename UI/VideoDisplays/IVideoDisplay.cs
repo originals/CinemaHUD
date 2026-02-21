@@ -18,8 +18,6 @@ namespace CinemaModule.UI.VideoDisplays
 
         long Duration { get; set; }
 
-        bool IsBuffering { get; set; }
-
         bool IsOffline { get; set; }
 
         Texture2D OfflineTexture { get; set; }

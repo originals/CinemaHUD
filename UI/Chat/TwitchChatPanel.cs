@@ -18,7 +18,6 @@ namespace CinemaModule.UI.Chat
         private const int InputAreaHeight = 40;
         private const int SendButtonWidth = 50;
         private const int PauseButtonWidth = 80;
-        private static readonly Color BorderColor = new Color(100, 65, 165);
 
         private readonly TwitchChatService _chatService;
         private readonly List<TwitchChatMessage> _messages = new List<TwitchChatMessage>();
@@ -455,18 +454,6 @@ namespace CinemaModule.UI.Chat
                 ? _inputPanel.Width - SendButtonWidth - PauseButtonWidth - 10
                 : _inputPanel.Width - PauseButtonWidth - 5;
             _pauseButton.Location = new Point(pauseX, 5);
-        }
-
-        public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
-        {
-            base.PaintBeforeChildren(spriteBatch, bounds);
-
-            var pixel = ContentService.Textures.Pixel;
-
-            spriteBatch.Draw(pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), BorderColor);
-            spriteBatch.Draw(pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), BorderColor);
-            spriteBatch.Draw(pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), BorderColor);
-            spriteBatch.Draw(pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), BorderColor);
         }
 
         protected override void DisposeControl()

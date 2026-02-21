@@ -94,8 +94,6 @@ namespace CinemaModule.UI.VideoDisplays
             set => _controlsOverlay.Duration = value;
         }
 
-        public bool IsBuffering { get; set; }
-
         public bool IsLocked
         {
             get => _controlsOverlay.IsLocked;
@@ -251,11 +249,6 @@ namespace CinemaModule.UI.VideoDisplays
                 spriteBatch.Draw(_currentTexture, videoRect, Color.White);
             }
 
-            if (IsBuffering)
-            {
-                DrawBufferingSpinner(spriteBatch, panelRect);
-            }
-
             DrawBorder(spriteBatch, panelRect, new Color(80, 80, 80, 210));
             DrawCornerHandles(spriteBatch, panelRect);
 
@@ -336,18 +329,6 @@ namespace CinemaModule.UI.VideoDisplays
 
                 spriteBatch.Draw(resizeTexture, resizeRect, Color.White);
             }
-        }
-
-        private void DrawBufferingSpinner(SpriteBatch spriteBatch, Rectangle panelRect)
-        {
-            const int SpinnerSize = 64;
-            var spinnerRect = new Rectangle(
-                panelRect.X + (panelRect.Width - SpinnerSize) / 2,
-                panelRect.Y + (panelRect.Height - SpinnerSize) / 2,
-                SpinnerSize,
-                SpinnerSize);
-
-            LoadingSpinnerUtil.DrawLoadingSpinner(this, spriteBatch, spinnerRect);
         }
 
         protected override void OnLeftMouseButtonPressed(MouseEventArgs e)

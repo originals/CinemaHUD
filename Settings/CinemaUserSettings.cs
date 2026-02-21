@@ -183,6 +183,12 @@ namespace CinemaModule.Settings
             set => SetProperty(_data.SelectedSettingsTab, value, v => _data.SelectedSettingsTab = v);
         }
 
+        public int SettingsWindowHeight
+        {
+            get => _data.SettingsWindowHeight;
+            set => SetProperty(_data.SettingsWindowHeight, value, v => _data.SettingsWindowHeight = v);
+        }
+
         public bool TwitchChatWindowLocked
         {
             get => _data.TwitchChatWindowLocked;
@@ -429,6 +435,7 @@ namespace CinemaModule.Settings
         public string TwitchRefreshToken { get; set; }
         public string LastSelectedSourceCategory { get; set; }
         public int SelectedSettingsTab { get; set; }
+        public int SettingsWindowHeight { get; set; }
         public bool TwitchChatWindowLocked { get; set; }
         public bool TwitchChatWindowOpen { get; set; }
         public Point TwitchChatWindowSize { get; set; } = new Point(439, 514);

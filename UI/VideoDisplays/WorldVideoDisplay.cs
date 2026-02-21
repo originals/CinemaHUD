@@ -17,13 +17,12 @@ namespace CinemaModule.UI.VideoDisplays
         #region Fields
 
         private const float MinVisibleDistance = 0.001f;
-        private const float ForwardDotThreshold = 0.01f;
-        private const int MinVisibleWidth = 8;
-        private const int MinVisibleHeight = 4;
-        private const float BehindCameraThreshold = -5000f;
-        private const float MinAreaThreshold = 10f;
-        private const float CrossProductEpsilon = 0.001f;
-        private const int SpinnerSize = 64;
+            private const float ForwardDotThreshold = 0.01f;
+            private const int MinVisibleWidth = 8;
+            private const int MinVisibleHeight = 4;
+            private const float BehindCameraThreshold = -5000f;
+            private const float MinAreaThreshold = 10f;
+            private const float CrossProductEpsilon = 0.001f;
 
         private Texture2D _videoTexture;
         private WorldPosition3D _worldPosition;
@@ -132,8 +131,6 @@ namespace CinemaModule.UI.VideoDisplays
                 }
             }
         }
-
-        public bool IsBuffering { get; set; }
 
         public bool IsOffline { get; set; }
 
@@ -545,22 +542,6 @@ namespace CinemaModule.UI.VideoDisplays
             {
                 spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, null, null);
             }
-
-            if (IsBuffering)
-            {
-                DrawBufferingSpinner(spriteBatch, bounds);
-            }
-        }
-
-        private void DrawBufferingSpinner(SpriteBatch spriteBatch, Rectangle bounds)
-        {
-            var spinnerRect = new Rectangle(
-                bounds.X + (bounds.Width - SpinnerSize) / 2,
-                bounds.Y + (bounds.Height - SpinnerSize) / 2,
-                SpinnerSize,
-                SpinnerSize);
-
-            LoadingSpinnerUtil.DrawLoadingSpinner(this, spriteBatch, spinnerRect);
         }
 
 

@@ -1,3 +1,4 @@
+using System;
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
@@ -13,11 +14,12 @@ namespace CinemaHUD.UI.Windows.MainSettings
     {
         #region Members
 
-        // Standard Blish HUD TabbedWindow2 dimensions (matches 155985 background texture)
         private const int WindowWidth = 890;
-        private const int WindowHeight = 680;
+        private const int BackgroundHeight = 688;
+        private const int MinWindowHeight = 460;
+        private const int MaxWindowHeight = 1400;
         private const int ContentWidth = 836;
-        private const int ContentHeight = 631;
+        private const int ContentHeightOffset = 49;
 
         private readonly CinemaSettings _settings;
         private readonly CinemaUserSettings _userSettings;
@@ -29,6 +31,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private ThirdPartyNoticesWindow _thirdPartyNoticesWindow;
         private StandardButton _infoButton;
+        private int _fixedWidth;
 
         #endregion
 
@@ -43,8 +46,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             PresetService presetService)
             : base(
                 AsyncTexture2D.FromAssetId(155985),
-                new Rectangle(40, 26, WindowWidth, WindowHeight),
-                new Rectangle(70, 36, ContentWidth, ContentHeight))
+                new Rectangle(40, 26, WindowWidth, BackgroundHeight),
+                new Rectangle(70, 36, ContentWidth, BackgroundHeight - ContentHeightOffset))
         {
             _settings = settings;
             _userSettings = userSettings;
@@ -60,12 +63,27 @@ namespace CinemaHUD.UI.Windows.MainSettings
             Location = new Point(300, 300);
             SavesPosition = true;
             Id = "CinemaModule_SettingsWindow";
+            CanResize = true;
 
             BuildTabs();
             BuildInfoButton();
 
+            _fixedWidth = Width;
+
             TabChanged += OnTabChanged;
+            Resized += OnWindowResized;
             UpdateSubtitleForCurrentTab();
+
+            ApplySavedHeight();
+        }
+
+        private void ApplySavedHeight()
+        {
+            int savedHeight = _userSettings.SettingsWindowHeight;
+            if (savedHeight >= MinWindowHeight && savedHeight <= MaxWindowHeight && savedHeight != Height)
+            {
+                Size = new Point(_fixedWidth, savedHeight);
+            }
         }
 
         public override void Show()
@@ -134,6 +152,23 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 return;
 
             SelectedTab = Tabs.FromIndex(savedTabIndex);
+        }
+
+        private void OnWindowResized(object sender, ResizedEventArgs e)
+        {
+            int clampedHeight = Math.Max(MinWindowHeight, Math.Min(Height, MaxWindowHeight));
+            if (Width != _fixedWidth || Height != clampedHeight)
+            {
+                Size = new Point(_fixedWidth, clampedHeight);
+            }
+
+            _userSettings.SettingsWindowHeight = Height - 40;
+            UpdateInfoButtonPosition();
+        }
+
+        private void UpdateInfoButtonPosition()
+        {
+            _infoButton.Location = new Point(ContentRegion.Width - 150, ContentRegion.Height + 10);
         }
 
         #endregion
