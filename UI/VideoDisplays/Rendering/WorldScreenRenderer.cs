@@ -33,6 +33,7 @@ namespace CinemaModule.UI.VideoDisplays.Rendering
         private VertexPositionColorTexture[] _innerFrameVertices = new VertexPositionColorTexture[SideVerticesCount];
         private VertexPositionColorTexture[] _logoVertices = new VertexPositionColorTexture[VerticesPerQuad];
         private VertexPositionColorTexture[] _textVertices = new VertexPositionColorTexture[VerticesPerQuad];
+        private VertexPositionColorTexture[] _overlayVertices = new VertexPositionColorTexture[VerticesPerQuad];
 
         private BasicEffect _basicEffect;
         private AsyncTexture2D _logoTexture;
@@ -268,6 +269,75 @@ namespace CinemaModule.UI.VideoDisplays.Rendering
                 : GetTextureOrFallback(_screenOffTexture);
 
             ApplyEffectAndDrawQuad(graphicsDevice, _quadVertices, 0);
+        }
+
+        public void RenderOverlay(GraphicsDevice graphicsDevice, Matrix viewMatrix, Matrix projectionMatrix, Texture2D overlayTexture, float opacity)
+        {
+            if (!_initialized || !_corners.IsValid) return;
+            if (!CinemaModule.Instance.TextureService.IsTextureReady(overlayTexture)) return;
+
+            var savedState = SaveGraphicsState(graphicsDevice);
+            try
+            {
+                SetRenderState(graphicsDevice);
+
+                _basicEffect.World = Matrix.Identity;
+                _basicEffect.View = viewMatrix;
+                _basicEffect.Projection = projectionMatrix;
+
+                byte alpha = CalculateAlpha(opacity);
+                Color color = CreateOpaqueColorWithAlpha(alpha);
+
+                Vector3[] corners = _corners.WorldCorners;
+                Vector3 right = corners[1] - corners[0];
+                Vector3 down = corners[3] - corners[0];
+                Vector3 normal = Vector3.Normalize(Vector3.Cross(down, right));
+                Vector3 overlayOffset = normal * 0.02f;
+
+                float textureAspect = (float)overlayTexture.Width / overlayTexture.Height;
+                float quadWidth = right.Length();
+                float quadHeight = down.Length();
+
+                float boxLeftRatio = 0.42f;
+                float boxRightRatio = 0.92f;
+                float boxTopRatio = 0.07f;
+                float boxBottomRatio = 0.27f;
+
+                float boxWidth = quadWidth * (boxRightRatio - boxLeftRatio);
+                float boxHeight = quadHeight * (boxBottomRatio - boxTopRatio);
+
+                float fitWidth = boxWidth;
+                float fitHeight = fitWidth / textureAspect;
+
+                if (fitHeight > boxHeight)
+                {
+                    fitHeight = boxHeight;
+                    fitWidth = fitHeight * textureAspect;
+                }
+
+                float boxCenterX = boxLeftRatio + (boxRightRatio - boxLeftRatio) / 2f;
+                float boxCenterY = boxTopRatio + (boxBottomRatio - boxTopRatio) / 2f;
+
+                Vector3 rightNorm = Vector3.Normalize(right);
+                Vector3 downNorm = Vector3.Normalize(down);
+
+                Vector3 boxCenter = corners[0] + rightNorm * (quadWidth * boxCenterX) + downNorm * (quadHeight * boxCenterY) + overlayOffset;
+
+                Vector3 halfRight = rightNorm * (fitWidth / 2f);
+                Vector3 halfDown = downNorm * (fitHeight / 2f);
+
+                _overlayVertices[0] = new VertexPositionColorTexture(boxCenter - halfRight - halfDown, color, new Vector2(0, 0));
+                _overlayVertices[1] = new VertexPositionColorTexture(boxCenter + halfRight - halfDown, color, new Vector2(1, 0));
+                _overlayVertices[2] = new VertexPositionColorTexture(boxCenter + halfRight + halfDown, color, new Vector2(1, 1));
+                _overlayVertices[3] = new VertexPositionColorTexture(boxCenter - halfRight + halfDown, color, new Vector2(0, 1));
+
+                _basicEffect.Texture = overlayTexture;
+                ApplyEffectAndDrawQuad(graphicsDevice, _overlayVertices, 0);
+            }
+            finally
+            {
+                RestoreGraphicsState(graphicsDevice, savedState);
+            }
         }
 
         private void DrawIndexedQuad(GraphicsDevice graphicsDevice, VertexPositionColorTexture[] vertices, int vertexOffset)

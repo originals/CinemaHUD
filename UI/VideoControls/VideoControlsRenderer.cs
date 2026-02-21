@@ -28,6 +28,9 @@ namespace CinemaModule.UI.Controls
         private readonly AsyncTexture2D _lockIconTexture;
         private readonly AsyncTexture2D _lockActiveIconTexture;
 
+        private RenderTarget2D _trackNameTexture;
+        private string _cachedTrackName;
+
         #endregion
 
         public VideoControlsRenderer(TextureService textureService)
@@ -224,6 +227,103 @@ namespace CinemaModule.UI.Controls
             var textPos = new Vector2(bounds.X, bounds.Y + (bounds.Height - font.LineHeight) / 2f);
 
             spriteBatch.DrawString(font, displayText, textPos, textColor);
+        }
+
+        public void DrawRadioTrackInfo(
+            SpriteBatch spriteBatch,
+            Rectangle bounds,
+            string trackName,
+            float opacity)
+        {
+            if (string.IsNullOrEmpty(trackName)) return;
+
+            var graphicsDevice = spriteBatch.GraphicsDevice;
+            UpdateTrackNameTexture(graphicsDevice, trackName);
+
+            if (_trackNameTexture == null || _trackNameTexture.IsDisposed) return;
+
+            float boxLeftRatio = 0.42f;
+            float boxRightRatio = 0.92f;
+            float boxTopRatio = 0.07f;
+            float boxBottomRatio = 0.27f;
+
+            int boxX = bounds.X + (int)(bounds.Width * boxLeftRatio);
+            int boxY = bounds.Y + (int)(bounds.Height * boxTopRatio);
+            int boxWidth = (int)(bounds.Width * (boxRightRatio - boxLeftRatio));
+            int boxHeight = (int)(bounds.Height * (boxBottomRatio - boxTopRatio));
+
+            float textureAspect = (float)_trackNameTexture.Width / _trackNameTexture.Height;
+            int drawWidth = boxWidth;
+            int drawHeight = (int)(drawWidth / textureAspect);
+
+            if (drawHeight > boxHeight)
+            {
+                drawHeight = boxHeight;
+                drawWidth = (int)(drawHeight * textureAspect);
+            }
+
+            int drawX = boxX + (boxWidth - drawWidth) / 2;
+            int drawY = boxY + (boxHeight - drawHeight) / 2;
+
+            var destRect = new Rectangle(drawX, drawY, drawWidth, drawHeight);
+            var color = ApplyOpacity(Color.White, opacity);
+
+            spriteBatch.Draw(_trackNameTexture, destRect, color);
+        }
+
+        private void UpdateTrackNameTexture(GraphicsDevice graphicsDevice, string trackName)
+        {
+            if (_cachedTrackName == trackName && _trackNameTexture != null && !_trackNameTexture.IsDisposed)
+                return;
+
+            _cachedTrackName = trackName;
+            _trackNameTexture?.Dispose();
+
+            var font = GameService.Content.DefaultFont32;
+            if (font == null) return;
+
+            string displayText = "Now Playing: " + trackName;
+            var textSize = font.MeasureString(displayText);
+
+            int padding = 8;
+            int width = (int)textSize.Width + padding * 2;
+            int height = (int)textSize.Height + padding * 2;
+
+            if (width <= 0 || height <= 0) return;
+
+            _trackNameTexture = new RenderTarget2D(graphicsDevice, width, height, false, 
+                SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+
+            var previousTargets = graphicsDevice.GetRenderTargets();
+            graphicsDevice.SetRenderTarget(_trackNameTexture);
+            graphicsDevice.Clear(Color.Transparent);
+
+            var spriteBatch = new SpriteBatch(graphicsDevice);
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+
+            var textColor = new Color(200, 225, 255);
+            var textPos = new Vector2(padding, padding);
+            spriteBatch.DrawString(font, displayText, textPos, textColor);
+
+            spriteBatch.End();
+            spriteBatch.Dispose();
+
+            graphicsDevice.SetRenderTargets(previousTargets);
+        }
+
+        public Texture2D GetOrCreateTrackNameTexture(GraphicsDevice graphicsDevice, string trackName)
+        {
+            if (string.IsNullOrEmpty(trackName)) return null;
+
+            UpdateTrackNameTexture(graphicsDevice, trackName);
+            return _trackNameTexture;
+        }
+
+        public void DisposeTrackNameTexture()
+        {
+            _trackNameTexture?.Dispose();
+            _trackNameTexture = null;
+            _cachedTrackName = null;
         }
 
         #endregion

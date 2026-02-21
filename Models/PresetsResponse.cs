@@ -171,11 +171,20 @@ namespace CinemaModule.Models
         [JsonProperty("staticImage")]
         public override string StaticImage { get; set; }
 
+        [JsonProperty("twitchName")]
+        public string TwitchName { get; set; }
+
         [JsonProperty("position")]
         public WorldPosition3D Position { get; set; }
 
         [JsonProperty("screenWidth")]
         public float? ScreenWidth { get; set; }
+
+        [JsonProperty("asylumInfo")]
+        public bool AsylumInfo { get; set; }
+
+        [JsonIgnore]
+        public bool IsTwitchChannel => string.Equals(TypeString, "twitch", System.StringComparison.OrdinalIgnoreCase);
 
         [JsonIgnore]
         public bool HasWorldPosition => Position != null && ScreenWidth.HasValue && ScreenWidth.Value > 0;
@@ -210,7 +219,8 @@ namespace CinemaModule.Models
                 Url = Url,
                 InfoUrl = InfoUrl,
                 StaticImage = StaticImage,
-                StaticImageTexture = StaticImageTexture
+                StaticImageTexture = StaticImageTexture,
+                AsylumInfo = AsylumInfo
             };
         }
     }
@@ -242,6 +252,9 @@ namespace CinemaModule.Models
 
         [JsonProperty("staticImage")]
         public override string StaticImage { get; set; }
+
+        [JsonProperty("asylumInfo")]
+        public bool AsylumInfo { get; set; }
     }
 
     public class WorldLocationPresetData

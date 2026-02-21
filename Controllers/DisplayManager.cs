@@ -305,6 +305,11 @@ namespace CinemaModule.Controllers
             _windowDisplay.GameName = gameName;
         }
 
+        public void UpdateRadioTrackInfo(string trackName)
+        {
+            ForEachDisplay(d => d.RadioTrackName = trackName);
+        }
+
         public void Dispose()
         {
             if (_isDisposed)

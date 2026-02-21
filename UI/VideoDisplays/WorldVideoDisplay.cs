@@ -36,6 +36,7 @@ namespace CinemaModule.UI.VideoDisplays
         private WorldVideoControls _controlPanel;
         private readonly ScreenCornerCalculator _cornerCalculator = new ScreenCornerCalculator();
         private WorldScreenRenderer _renderer;
+        private VideoControlsRenderer _controlsRenderer;
 
         private float _fadeStartDistance = 65f;
         private float _maxDistance = 70f;
@@ -136,6 +137,8 @@ namespace CinemaModule.UI.VideoDisplays
 
         public Texture2D OfflineTexture { get; set; }
 
+        public string RadioTrackName { get; set; }
+
         public event EventHandler<float> SeekRequested;
 
         public WorldPosition3D WorldPosition
@@ -165,6 +168,7 @@ namespace CinemaModule.UI.VideoDisplays
         {
             _worldPosition = new WorldPosition3D();
             _renderer = new WorldScreenRenderer(_cornerCalculator);
+            _controlsRenderer = new VideoControlsRenderer(CinemaModule.Instance.TextureService);
             ClipsBounds = false;
         }
 
@@ -537,6 +541,12 @@ namespace CinemaModule.UI.VideoDisplays
                     ? OfflineTexture
                     : _videoTexture;
                 _renderer.Render(graphicsDevice, viewMatrix, projectionMatrix, textureToRender, _currentOpacity);
+
+                if (!string.IsNullOrEmpty(RadioTrackName))
+                {
+                    var trackNameTexture = _controlsRenderer.GetOrCreateTrackNameTexture(graphicsDevice, RadioTrackName);
+                    _renderer.RenderOverlay(graphicsDevice, viewMatrix, projectionMatrix, trackNameTexture, _currentOpacity);
+                }
             }
             finally
             {
@@ -551,6 +561,7 @@ namespace CinemaModule.UI.VideoDisplays
         {
             _controlPanel?.Dispose();
             _renderer?.Dispose();
+            _controlsRenderer?.DisposeTrackNameTexture();
             base.DisposeControl();
         }
 

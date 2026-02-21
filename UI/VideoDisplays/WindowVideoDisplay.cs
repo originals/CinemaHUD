@@ -27,6 +27,7 @@ namespace CinemaModule.UI.VideoDisplays
 
         private Texture2D _currentTexture;
         private WindowVideoControls _controlsOverlay;
+        private VideoControlsRenderer _renderer;
 
         private readonly AsyncTexture2D _textureResizeCorner = CinemaModule.Instance.TextureService.GetResizeCorner();
         private readonly AsyncTexture2D _textureResizeCornerActive = CinemaModule.Instance.TextureService.GetResizeCornerActive();
@@ -122,6 +123,8 @@ namespace CinemaModule.UI.VideoDisplays
 
         public Texture2D OfflineTexture { get; set; }
 
+        public string RadioTrackName { get; set; }
+
         public new Point Size
         {
             get => base.Size;
@@ -172,6 +175,7 @@ namespace CinemaModule.UI.VideoDisplays
             Size = new Point(800, 450);
             Location = new Point(100, 50);
 
+            _renderer = new VideoControlsRenderer(CinemaModule.Instance.TextureService);
             _controlsOverlay = new WindowVideoControls(this);
             _controlsOverlay.PlayPauseClicked += (s, e) => PlayPauseClicked?.Invoke(this, EventArgs.Empty);
             _controlsOverlay.VolumeChanged += (s, vol) => VolumeChanged?.Invoke(this, vol);
@@ -247,6 +251,11 @@ namespace CinemaModule.UI.VideoDisplays
             else if (_currentTexture != null && !_currentTexture.IsDisposed)
             {
                 spriteBatch.Draw(_currentTexture, videoRect, Color.White);
+            }
+
+            if (!string.IsNullOrEmpty(RadioTrackName))
+            {
+                _renderer.DrawRadioTrackInfo(spriteBatch, videoRect, RadioTrackName, 1f);
             }
 
             DrawBorder(spriteBatch, panelRect, new Color(80, 80, 80, 210));

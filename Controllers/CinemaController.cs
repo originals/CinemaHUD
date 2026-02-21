@@ -24,6 +24,7 @@ namespace CinemaModule
         private readonly CinemaSettings _moduleSettings;
         private readonly CinemaUserSettings _userSettings;
         private readonly TwitchService _twitchService;
+        private readonly RadioMetadataService _radioMetadataService;
 
         private readonly PlaybackController _playbackController;
         private readonly DisplayManager _displayManager;
@@ -48,10 +49,13 @@ namespace CinemaModule
             _moduleSettings = coreSettings;
             _userSettings = userSettings;
             _twitchService = twitchService;
+            _radioMetadataService = new RadioMetadataService();
 
             _playbackController = new PlaybackController(coreSettings, userSettings, twitchService);
             _displayManager = new DisplayManager(coreSettings, userSettings);
             _twitchHandler = new TwitchIntegrationHandler(userSettings, twitchService);
+
+            _radioMetadataService.TrackInfoUpdated += OnRadioTrackInfoUpdated;
 
             SubscribeToHandlerEvents();
             SubscribeToSettingsEvents();
@@ -77,6 +81,7 @@ namespace CinemaModule
             _displayManager.UpdateTwitchStreamState(IsTwitchStream);
             _displayManager.UpdateDisplayVisibility();
             _twitchHandler.InitializeStreamInfo();
+            UpdateRadioMetadataPolling();
         }
 
         public void Update()
@@ -211,10 +216,12 @@ namespace CinemaModule
             if (e.NewValue)
             {
                 _displayManager.UpdateDisplayVisibility();
+                UpdateRadioMetadataPolling();
             }
             else
             {
                 _displayManager.HideAllDisplays();
+                _radioMetadataService.StopPolling();
             }
         }
 
@@ -225,6 +232,7 @@ namespace CinemaModule
             _currentTwitchStreamInfo = null;
             _playbackController.HandleStreamUrlChanged(url);
             _twitchHandler.HandleStreamUrlChanged(IsTwitchStream);
+            UpdateRadioMetadataPolling();
         }
 
         private void OnDisplayModeChanged(object sender, CinemaDisplayMode mode)
@@ -254,10 +262,13 @@ namespace CinemaModule
         {
             _displayManager.UpdateTwitchStreamState(IsTwitchStream);
             _twitchHandler.HandleStreamSourceTypeChanged(sourceType);
+            UpdateRadioMetadataPolling();
         }
 
         private void OnCurrentStreamPresetChanged(object sender, StreamPresetData preset)
         {
+            UpdateRadioMetadataPolling();
+
             if (_playbackController.IsOffline)
             {
                 _ = LoadOfflineTextureAsync();
@@ -382,6 +393,30 @@ namespace CinemaModule
                 _userSettings.DisplayMode);
         }
 
+        private void OnRadioTrackInfoUpdated(object sender, RadioTrackInfo trackInfo)
+        {
+            string trackName = trackInfo?.TrackName;
+            _displayManager.UpdateRadioTrackInfo(trackName);
+        }
+
+        private void UpdateRadioMetadataPolling()
+        {
+            var preset = _userSettings.CurrentStreamPreset;
+            bool isRadio = preset?.IsRadio == true;
+            bool showMetadata = preset?.AsylumInfo == true;
+
+            if (!isRadio || IsTwitchStream || !showMetadata)
+            {
+                _radioMetadataService.StopPolling();
+                _displayManager.UpdateRadioTrackInfo(null);
+                return;
+            }
+
+            string streamUrl = _userSettings.StreamUrl;
+            string infoUrl = preset?.InfoUrl;
+            _radioMetadataService.StartPolling(streamUrl, infoUrl);
+        }
+
         #endregion
 
         #region IDisposable
@@ -393,6 +428,8 @@ namespace CinemaModule
 
             UnsubscribeFromSettingsEvents();
 
+            _radioMetadataService.TrackInfoUpdated -= OnRadioTrackInfoUpdated;
+            _radioMetadataService?.Dispose();
             _playbackController?.Dispose();
             _displayManager?.Dispose();
             _twitchHandler?.Dispose();

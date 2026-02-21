@@ -3,6 +3,18 @@
 All notable changes to CinemaHUD will be documented in this file.
 
 
+
+
+## [1.2.0]
+
+### Added
+- Ability to also show twitch channels in catogorys with other links
+- Now playing song information on screen for asylumradio
+
+### Bugfix
+- Worldcontrols spacing when quality selection is not available
+
+
 ## [1.1.2]
 ### Added
 - Resizeble settingswindow in height

@@ -22,6 +22,8 @@ namespace CinemaModule.UI.VideoDisplays
 
         Texture2D OfflineTexture { get; set; }
 
+        string RadioTrackName { get; set; }
+
         void UpdateTexture(Texture2D texture);
 
         void UpdateAvailableQualities(IReadOnlyList<string> qualityNames, int selectedIndex);

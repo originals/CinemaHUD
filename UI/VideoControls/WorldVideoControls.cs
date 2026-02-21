@@ -234,14 +234,19 @@ namespace CinemaModule.UI.Controls
             bool hasQualities = _base.QualityDropdown.Items.Count > 0;
             _base.QualityDropdown.Visible = hasQualities;
 
-            int twitchChatX = dropdownX + BaseVideoControls.QualityDropdownWidth + BaseVideoControls.ControlSpacing;
+            int nextX = hasQualities 
+                ? dropdownX + BaseVideoControls.QualityDropdownWidth + BaseVideoControls.ControlSpacing 
+                : dropdownX;
+
             _twitchChatBounds = new Rectangle(
-                twitchChatX,
+                nextX,
                 centerY - BaseVideoControls.IconSize / 2,
                 BaseVideoControls.IconSize,
                 BaseVideoControls.IconSize);
 
-            int settingsX = (IsTwitchStream ? _twitchChatBounds.Right : twitchChatX) + (IsTwitchStream ? BaseVideoControls.ControlSpacing : 0);
+            int settingsX = IsTwitchStream 
+                ? _twitchChatBounds.Right + BaseVideoControls.ControlSpacing 
+                : nextX;
             _settingsBounds = new Rectangle(
                 settingsX,
                 centerY - BaseVideoControls.IconSize / 2,
