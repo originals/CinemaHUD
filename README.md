@@ -280,6 +280,7 @@ CinemaHUD uses LibVLC for media playback.
 
 | Limitation | Description |
 |------------|-------------|
+| **Twitch Ads** | Ads will play even if you are subscribed to a channel. CinemaHUD is not a first-party Twitch app, so subscription ad-free benefits do not apply. |
 | **World Screen Occlusion** | In-game world screens render on top of all objects. Players and objects between you and the screen will not occlude it. |
 | **Performance** | Video playback may impact performance on lower-end systems. Reduce stream quality if needed. |
 

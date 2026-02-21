@@ -2,6 +2,21 @@
 
 All notable changes to CinemaHUD will be documented in this file.
 
+
+## [1.1.2]
+### Added
+- Resizeble settingswindow in height
+
+### Bugfix
+- Removed purple testing borders
+- Removed buffer loading spinner
+
+
+## [1.1.1]
+
+### Bugfix
+- Not redrawing screens correctly
+
 ## [1.1.0]
 
 ### Added
@@ -18,13 +33,14 @@ All notable changes to CinemaHUD will be documented in this file.
 - Redesigned mainsettings windows 
 - videocontrols for both window and world displays
 
+## [1.0.1]
 
+### Bugfix
+- World display controls were not showing after moving location
+
+- 
 ## [1.0.0]
 
 ### Added
 - Initial release of CinemaHUD
 
-## [1.0.1]
-
-### Bugfix
-- World display controls were not showing after moving location
