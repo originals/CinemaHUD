@@ -21,10 +21,31 @@ namespace CinemaModule.Models
     public class PresetsResponse
     {
         [JsonProperty("worldLocations")]
-        public List<WorldLocationPresetData> WorldLocations { get; set; } = new List<WorldLocationPresetData>();
+        public List<WorldLocationCategory> WorldLocationCategories { get; set; } = new List<WorldLocationCategory>();
 
         [JsonProperty("streams")]
         public List<StreamCategory> StreamCategories { get; set; } = new List<StreamCategory>();
+    }
+
+    public class WorldLocationCategory
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("icon")]
+        public string Icon { get; set; }
+
+        [JsonProperty("locations")]
+        public List<WorldLocationPresetData> Locations { get; set; } = new List<WorldLocationPresetData>();
+
+        [JsonIgnore]
+        public AsyncTexture2D IconTexture { get; set; }
     }
 
     public enum StreamCategoryType

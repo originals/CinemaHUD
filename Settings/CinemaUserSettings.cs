@@ -177,6 +177,12 @@ namespace CinemaModule.Settings
             set => SetProperty(_data.LastSelectedSourceCategory, value, v => _data.LastSelectedSourceCategory = v);
         }
 
+        public string LastSelectedLocationCategory
+        {
+            get => _data.LastSelectedLocationCategory;
+            set => SetProperty(_data.LastSelectedLocationCategory, value, v => _data.LastSelectedLocationCategory = v);
+        }
+
         public int SelectedSettingsTab
         {
             get => _data.SelectedSettingsTab;
@@ -434,6 +440,7 @@ namespace CinemaModule.Settings
         public string TwitchAccessToken { get; set; }
         public string TwitchRefreshToken { get; set; }
         public string LastSelectedSourceCategory { get; set; }
+        public string LastSelectedLocationCategory { get; set; }
         public int SelectedSettingsTab { get; set; }
         public int SettingsWindowHeight { get; set; }
         public bool TwitchChatWindowLocked { get; set; }

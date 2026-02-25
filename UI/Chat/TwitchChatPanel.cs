@@ -441,7 +441,7 @@ namespace CinemaModule.UI.Chat
             var canSend = isAuthenticated && _chatService.IsConnected;
 
             _loginStatusLabel.Text = isAuthenticated
-                ? $"Logged in: {_chatService.Username}"
+                ? $"as: {_chatService.Username}"
                 : "Not logged in - read only";
             _loginStatusLabel.TextColor = isAuthenticated ? Color.LightGreen : Color.Gray;
 

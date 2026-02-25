@@ -71,6 +71,7 @@ namespace CinemaModule.UI.Chat
             Id = "CinemaModule_TwitchChatWindow";
             SavesPosition = true;
             SavesSize = false;
+            ZIndex = -9001;
             Location = new Point(
                 (GameService.Graphics.SpriteScreen.Width - Width) / 2,
                 (GameService.Graphics.SpriteScreen.Height - Height) / 2);

@@ -174,6 +174,7 @@ namespace CinemaModule.UI.VideoDisplays
             ShowBorder = false;
             Size = new Point(800, 450);
             Location = new Point(100, 50);
+            ZIndex = -9001;
 
             _renderer = new VideoControlsRenderer(CinemaModule.Instance.TextureService);
             _controlsOverlay = new WindowVideoControls(this);

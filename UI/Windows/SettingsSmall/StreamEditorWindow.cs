@@ -188,6 +188,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             _nameTextBox.Text = "";
             _sourceTypeDropdown.SelectedItem = GetDropdownValue(sourceType);
             _valueTextBox.Text = "";
+            _saveButton.Visible = true;
             _deleteButton.Visible = false;
 
             OnSourceTypeChanged();
@@ -203,6 +204,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             _nameTextBox.Text = stream.Name ?? "";
             _sourceTypeDropdown.SelectedItem = GetDropdownValue(stream.SourceType);
             _valueTextBox.Text = stream.Value ?? "";
+            _saveButton.Visible = true;
             _deleteButton.Visible = true;
 
             OnSourceTypeChanged();

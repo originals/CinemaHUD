@@ -42,10 +42,12 @@
 | **Twitch Integration** | Watch live Twitch streams with quality selection |
 | **Followed Channels** | Link your Twitch account to see your followed live channels |
 | **Custom URLs** | Play any video URL supported by LibVLC |
+| **On-Demand Content** | Play pre-recorded videos and VODs alongside live streams |
+| **Radio Streams** | Play internet radio with live track info display |
 | **On-Screen Display** | Floating window overlay, freely position and resize |
-| **In-Game World Display** | Place video screens at custom locations in the game world |
+| **In-Game World Display** | Place 3D video screens at custom locations in the game world |
 | **Twitch Chat** | View Twitch chat in a separate dockable window |
-| **Presets** | Community-curated stream presets and world locations |
+| **Presets** | Pre-configured stream presets and world locations |
 | **Save & Share** | Add, save, export, and import your own streams and locations |
 
 ---
@@ -65,13 +67,14 @@
 
 A floating video window that stays on top of the game. Drag to reposition and resize to your preference.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of On-Screen Display mode showing a video playing in a floating window overlay -->
+![On-Screen Display](https://www.gw2opus.com/wp-content/uploads/2026/02/windowedscreen.png)
 
 | Action | Control |
 |--------|---------|
 | Move window | Drag anywhere on the video |
 | Resize | Drag corners or edges |
 | Show controls | Hover over the video |
+| Lock position | Click lock icon to prevent accidental moves |
 
 ---
 
@@ -79,7 +82,7 @@ A floating video window that stays on top of the game. Drag to reposition and re
 
 Place a virtual screen at any location in the game world. The screen renders in 3D and responds to your camera position.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of In-Game World Display showing a video screen placed in the game world -->
+![In-Game World Display](https://www.gw2opus.com/wp-content/uploads/2026/02/ingamescreen.png)
 
 Select a location from the Display tab or create your own using the Location Editor.
 
@@ -89,30 +92,42 @@ Select a location from the Display tab or create your own using the Location Edi
 
 Access the settings window via the CinemaHUD corner icon or Blish HUD module settings.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Main Settings Window -->
+![Access Settings](https://www.gw2opus.com/wp-content/uploads/2026/02/accesssettings.png)
 
 ### Display Tab
 
 Configure display mode and manage world screen locations.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Display Tab -->
+![Display Tab](https://www.gw2opus.com/wp-content/uploads/2026/02/displaysettings.png)
 
 | Element | Description |
 |---------|-------------|
 | **Enabled** | Toggle CinemaHUD on/off |
 | **Display Mode** | Switch between On-Screen and In-Game World |
-| **Locations List** | Browse preset and saved world locations |
-| **+ Add New** | Create a new world location |
-| **Import** | Import location from clipboard (JSON) |
+
+#### Categories Menu
+
+| Category | Description |
+|----------|-------------|
+| **My Locations** | Your saved custom world locations |
+| **Preset Categories** | Pre-configured locations for cities, meta events, and points of interest (e.g., Divinity's Reach, Infusion Meta Train) |
+
+#### Toolbar Icons (My Locations)
+
+| Icon | Action |
+|------|--------|
+| ![Add](https://www.gw2opus.com/wp-content/uploads/2026/02/addnew.png) | Add new custom location |
+| ![Import](https://www.gw2opus.com/wp-content/uploads/2026/02/import.png) | Import location from clipboard (JSON) |
 
 #### Location Card Actions
 
 | Icon | Action |
 |------|--------|
-| ![Info](<!-- ICON_PLACEHOLDER: info_icon -->) | View location details |
-| ![Edit](<!-- ICON_PLACEHOLDER: edit_icon -->) | Edit saved location |
-| ![Export](<!-- ICON_PLACEHOLDER: export_icon -->) | Export location to clipboard |
-| ![Delete](<!-- ICON_PLACEHOLDER: delete_icon -->) | Delete saved location |
+| ![Info](https://www.gw2opus.com/wp-content/uploads/2026/02/infoloc.png) | View location details (preset locations) |
+| ![Waypoint](https://www.gw2opus.com/wp-content/uploads/2026/02/wayploc.png) | Copy associated waypoint (preset locations) |
+| ![Edit](https://www.gw2opus.com/wp-content/uploads/2026/02/editloc.png) | Edit saved location |
+| ![Export](https://www.gw2opus.com/wp-content/uploads/2026/02/exportloc.png) | Export location to clipboard |
+| ![Delete](https://www.gw2opus.com/wp-content/uploads/2026/02/removeloc.png) | Delete saved location |
 
 ---
 
@@ -120,58 +135,87 @@ Configure display mode and manage world screen locations.
 
 Browse and select streams to play.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Source Tab -->
+![Source Tab](https://www.gw2opus.com/wp-content/uploads/2026/02/channelguide.png)
 
 #### Categories Menu
 
 | Category | Description |
 |----------|-------------|
-| **Preset Categories** | Community-curated stream collections (GW2, Music, etc.) |
+| **Preset Categories** | Pre-configured stream collections (GW2, Music, etc.) |
 | **Followed Channels** | Your followed Twitch channels (requires Twitch login) |
 | **My Streams** | Your saved custom streams |
+
+#### Stream Types
+
+| Type | Description |
+|------|-------------|
+| **Live Streams** | Twitch channels and other live broadcasts |
+| **On-Demand** | Hosted videos (direct video URLs)  |
+| **Radio** | Audio-only streams with track info display |
 
 #### Stream Card Actions
 
 | Icon | Action |
 |------|--------|
-| ![Chat](<!-- ICON_PLACEHOLDER: chat_icon -->) | Open Twitch chat for channel |
-| ![Waypoint](<!-- ICON_PLACEHOLDER: waypoint_icon -->) | Copy associated waypoint |
-| ![World](<!-- ICON_PLACEHOLDER: world_icon -->) | Apply world position preset |
-| ![Edit](<!-- ICON_PLACEHOLDER: edit_icon -->) | Edit saved stream |
-| ![Delete](<!-- ICON_PLACEHOLDER: delete_icon -->) | Delete saved stream |
+| ![Chat](https://www.gw2opus.com/wp-content/uploads/2026/02/twitch-chat.png) | Open Twitch chat for channel |
+| ![Waypoint](https://www.gw2opus.com/wp-content/uploads/2026/02/wayploc.png) | Copy associated waypoint |
+| ![World](https://www.gw2opus.com/wp-content/uploads/2026/02/worldicon.png) | Apply world position preset |
+| ![Youtube](https://www.gw2opus.com/wp-content/uploads/2026/02/youtube.png) | Open relevant youtube page |
+| ![Edit](https://www.gw2opus.com/wp-content/uploads/2026/02/editloc.png) | Edit saved stream |
+| ![Delete](https://www.gw2opus.com/wp-content/uploads/2026/02/removeloc.png) | Delete saved stream |
 
 #### Toolbar Icons
 
 | Icon | Action |
 |------|--------|
-| ![Refresh](<!-- ICON_PLACEHOLDER: refresh_icon -->) | Refresh category data |
-| ![Add](<!-- ICON_PLACEHOLDER: add_icon -->) | Add new custom stream |
-| ![Import](<!-- ICON_PLACEHOLDER: import_icon -->) | Import stream from clipboard |
+| ![Refresh](https://www.gw2opus.com/wp-content/uploads/2026/02/refresh.png) | Refresh category data |
+| ![Add](https://www.gw2opus.com/wp-content/uploads/2026/02/addnew.png) | Add new custom stream |
 
 ---
 
 ## Playback Controls
 
-Hover over the video to reveal playback controls.
+Hover over the video to reveal playback controls. Controls differ based on display mode:
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of playback controls overlay on the video -->
+### On-Screen Window Controls
+
+Controls appear as an overlay on the video window.
+
+![On-Screen Controls](https://www.gw2opus.com/wp-content/uploads/2026/02/controlsoverlay.png)
+
+### In-Game World Controls
+
+Controls appear at the bottom of your screen when looking at the world display.
+
+![In-Game World Controls](https://www.gw2opus.com/wp-content/uploads/2026/02/controlsingameworld.png)
 
 ### Control Bar Icons
 
 | Icon | Action |
 |------|--------|
-| ![Play/Pause](<!-- ICON_PLACEHOLDER: play_pause_icon -->) | Play or pause playback |
-| ![Volume](<!-- ICON_PLACEHOLDER: volume_icon -->) | Adjust volume (click to mute/unmute, drag slider) |
-| ![Chat](<!-- ICON_PLACEHOLDER: chat_icon -->) | Open Twitch chat window (Twitch streams only) |
-| ![Settings](<!-- ICON_PLACEHOLDER: settings_icon -->) | Open quality selection menu |
-| ![Lock](<!-- ICON_PLACEHOLDER: lock_icon -->) | Lock window position (prevents accidental moves) |
-| ![Close](<!-- ICON_PLACEHOLDER: close_icon -->) | Close video / disable CinemaHUD |
+| ![Play/Pause](https://www.gw2opus.com/wp-content/uploads/2026/02/pauseicon.png) | Play or pause playback |
+| ![Volume](https://www.gw2opus.com/wp-content/uploads/2026/02/volumecontrol.png) | Adjust volume (click to mute/unmute, drag slider) |
+| ![Chat](https://www.gw2opus.com/wp-content/uploads/2026/02/twitchchat.png) | Open Twitch chat window (Twitch streams only) |
+| ![Settings](https://www.gw2opus.com/wp-content/uploads/2026/02/settings.png) | Open quality selection menu |
+| ![Lock](https://www.gw2opus.com/wp-content/uploads/2026/02/lockscreen.png) | Lock window position (prevents accidental moves) |
+| ![Close](https://www.gw2opus.com/wp-content/uploads/2026/02/closeicon.png) | Close video / disable CinemaHUD |
+
+### Seek Bar
+
+For seekable content (video files, VODs), a seek bar appears showing playback progress. Click or drag to seek to a specific position.
+
+![Seek Bar](https://www.gw2opus.com/wp-content/uploads/2026/02/seekbar.png)
+
+### Stream Info
+
+For radio streams with metadata support (Shoutcast/Icecast), the current track name and artist are displayed on the screen.
+For overlay screen mode, info will appear next to the lock icon.
 
 ### Quality Selection
 
 Click the settings icon to open the quality menu. Available qualities depend on the stream source.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of quality selection dropdown -->
+![Quality Selection](https://www.gw2opus.com/wp-content/uploads/2026/02/quality.png)
 
 ---
 
@@ -179,7 +223,7 @@ Click the settings icon to open the quality menu. Available qualities depend on 
 
 A separate window displaying Twitch chat for the current channel.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Twitch Chat Window -->
+![Twitch Chat Window](https://www.gw2opus.com/wp-content/uploads/2026/02/chatwindow.png)
 
 | Feature | Description |
 |---------|-------------|
@@ -190,7 +234,7 @@ A separate window displaying Twitch chat for the current channel.
 
 ### Chat Authentication
 
-To view chat, link your Twitch account via the Source tab ? Followed Channels ? Login.
+To send messages in chat, link your Twitch account via the Source tab → Followed Channels → Login. Viewing chat does not require authentication.
 
 ---
 
@@ -200,13 +244,15 @@ To view chat, link your Twitch account via the Source tab ? Followed Channels ? 
 
 Add or edit custom streams.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Stream Editor Window -->
+![Stream Editor](https://www.gw2opus.com/wp-content/uploads/2026/02/editstream.png)
 
 | Field | Description |
 |-------|-------------|
 | **Stream Name** | Display name for the stream |
 | **Source Type** | Twitch Channel or URL |
-| **Value** | Channel name or media URL |
+| **Value** | Channel name or Stream URL |
+
+> **Note:** On-demand content (videos ending in .mp4, .webm, .mkv, etc.) is automatically detected.
 
 ---
 
@@ -214,15 +260,16 @@ Add or edit custom streams.
 
 Create or edit world screen locations.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Location Editor Window -->
+![Location Editor](https://www.gw2opus.com/wp-content/uploads/2026/02/editlocation.png)
 
 | Control | Description |
 |---------|-------------|
 | **Location Name** | Display name for the location |
 | **Set to My Current Position** | Capture current player position |
-| **Move Controls** | Fine-tune X/Y/Z position |
+| **Move Position Controls** | Fine-tune X/Y/Z position |
 | **Rotation Controls** | Adjust screen rotation |
 | **Screen Width** | Set the width of the world screen |
+| **Export** | Copy location data to clipboard (JSON) for sharing |
 
 ---
 
@@ -230,7 +277,7 @@ Create or edit world screen locations.
 
 Link your Twitch account to access followed channels.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Twitch Login Window -->
+![Twitch Login Window](https://www.gw2opus.com/wp-content/uploads/2026/02/twitchwindow.png)
 
 | Step | Action |
 |------|--------|
@@ -247,7 +294,7 @@ Your token is stored locally only and never shared.
 
 View details about a preset location.
 
-<!-- IMAGE_PLACEHOLDER: Screenshot of the Location Info Window -->
+![Location Info Window](https://www.gw2opus.com/wp-content/uploads/2026/02/infowindow.png)
 
 | Element | Description |
 |---------|-------------|
@@ -260,6 +307,21 @@ View details about a preset location.
 ### Third-Party Notices Window
 
 View licenses for third-party libraries used by CinemaHUD.
+
+---
+
+## Blish HUD Module Settings
+
+Access additional settings via the Blish HUD settings panel (Settings → Modules → CinemaHUD).
+
+![Blish HUD Module Settings](https://www.gw2opus.com/wp-content/uploads/2026/02/blishseettigns.png)
+
+
+| Element | Description |
+|---------|-------------|
+| **Enable Cinema** | Toggle CinemaHUD on/off |
+| **Twitch Login** | Connect your Twitch account (alternative to Source tab login) |
+| **Third-Party Notices** | View open source licenses |
 
 ---
 

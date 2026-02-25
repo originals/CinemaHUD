@@ -49,6 +49,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private readonly FlowPanel _textPanel;
         private readonly Panel _titleRow;
         private readonly List<Control> _buttons = new List<Control>();
+        private readonly object _buttonsLock = new object();
         private readonly ScrollingHighlightEffect _scrollEffect;
         private bool _isSelected;
 
@@ -234,7 +235,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
         protected override void OnClick(Blish_HUD.Input.MouseEventArgs e)
         {
             var mousePos = e.MousePosition;
-            foreach (var button in _buttons)
+            Control[] buttonsCopy;
+            lock (_buttonsLock)
+            {
+                buttonsCopy = _buttons.ToArray();
+            }
+
+            foreach (var button in buttonsCopy)
             {
                 if (button.AbsoluteBounds.Contains(mousePos))
                     return;
@@ -270,7 +277,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
                         glowButton.Click += (s, e) => buttonConfig.OnClick();
                     }
 
-                    _buttons.Add(glowButton);
+                    lock (_buttonsLock)
+                    {
+                        _buttons.Add(glowButton);
+                    }
                 }
                 else
                 {
@@ -295,7 +305,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
                         button.Click += (s, e) => buttonConfig.OnClick();
                     }
 
-                    _buttons.Add(button);
+                    lock (_buttonsLock)
+                    {
+                        _buttons.Add(button);
+                    }
                 }
 
                 rightPosition -= ButtonSpacing;
@@ -316,9 +329,12 @@ namespace CinemaHUD.UI.Windows.MainSettings
             if (_textPanel == null || _titleLabel == null || _subtitleLabel == null) return;
 
             int totalButtonWidth = 0;
-            foreach (var button in _buttons)
+            lock (_buttonsLock)
             {
-                totalButtonWidth += button.Width + ButtonSpacing;
+                foreach (var button in _buttons)
+                {
+                    totalButtonWidth += button.Width + ButtonSpacing;
+                }
             }
 
             int availableWidth = Width - _textPanel.Left - totalButtonWidth - ButtonSpacing - 20;
@@ -333,9 +349,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void RepositionButtons()
         {
-            if (_buttons.Count == 0) return;
+            Control[] buttonsCopy;
+            lock (_buttonsLock)
+            {
+                if (_buttons.Count == 0) return;
+                buttonsCopy = _buttons.ToArray();
+            }
 
-            var buttonsCopy = new List<Control>(_buttons);
             int rightPosition = Width - ButtonSpacing - 15;
             foreach (var button in buttonsCopy)
             {

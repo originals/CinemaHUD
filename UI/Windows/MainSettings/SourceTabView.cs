@@ -281,7 +281,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             if (_selectedCategoryId == CategoryFollowed)
                 LoadFollowedContentAsync(_contentCts.Token);
             else if (_selectedCategoryId == CategoryMyStreams)
-                LoadCustomContent();
+                LoadCustomContent(_contentCts.Token);
             else
             {
                 var category = _presetService.StreamCategories
@@ -404,7 +404,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _ = LoadAvatarsAsync(items, token);
         }
 
-        private async void LoadCustomContent()
+        private async void LoadCustomContent(CancellationToken token)
         {
             var customStreams = _settings.SavedStreams.Streams.ToList();
             if (customStreams.Count == 0)
@@ -415,8 +415,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             }
 
             ShowLoadingSpinner();
-            var statusMap = await _statusLoader.FetchCustomStreamStatusesAsync(customStreams, _contentCts.Token);
-            if (_contentCts.Token.IsCancellationRequested) return;
+            var statusMap = await _statusLoader.FetchCustomStreamStatusesAsync(customStreams, token);
+            if (token.IsCancellationRequested) return;
 
             ReplaceSpinnerWithContent();
             BuildCustomToolbar();
@@ -435,7 +435,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                     SelectSavedStream);
             }
 
-            _ = LoadCustomAvatarsAsync(customStreams, statusMap, _contentCts.Token);
+            _ = LoadCustomAvatarsAsync(customStreams, statusMap, token);
         }
 
         private List<StreamListItem> BuildTwitchItems(StreamCategory category)

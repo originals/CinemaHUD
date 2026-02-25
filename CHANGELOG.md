@@ -3,6 +3,17 @@
 All notable changes to CinemaHUD will be documented in this file.
 
 
+## [1.3.0]
+
+### Added
+- Location now also have catogorys for better organization
+- Display mode selection now includes info text
+
+### Improved
+- Lowered zindex of video overlay and twitch chat to stay in the background
+
+### Bugfix
+- Fixed crash when updating list cards
 
 
 ## [1.2.0]

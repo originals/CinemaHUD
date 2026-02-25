@@ -11,12 +11,23 @@ using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using LocationEditorWindow = CinemaHUD.UI.Windows.SettingsSmall.LocationEditorWindow;
 
 namespace CinemaHUD.UI.Windows.MainSettings
 {
     public class DisplayTabView : View
     {
+        #region Constants
+
+        private const int MenuPanelWidth = 240;
+        private const int CardVerticalSpacing = 4;
+        private const string KeyPrefixPreset = "preset:";
+        private const string KeyPrefixSaved = "saved:";
+        private const string CategoryMyLocations = "My Locations";
+
+        #endregion
+
         #region Members
 
         private static readonly Logger Logger = Logger.GetLogger<DisplayTabView>();
@@ -26,13 +37,20 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private readonly CinemaController _controller;
         private readonly Gw2MapService _mapService;
         private readonly PresetService _presetService;
-        
+
         private Checkbox _enabledCheckbox;
         private Dropdown _displayModeDropdown;
-        private Panel _locationSection;
         private Panel _windowHelpSection;
-        private FlowPanel _locationsContainer;
-        private Dictionary<string, ListCard> _locationCards = new Dictionary<string, ListCard>();
+        private Panel _locationSection;
+        private Menu _categoryMenu;
+        private Panel _menuPanel;
+        private Panel _contentContainer;
+        private Panel _headerSection;
+        private FlowPanel _cardsPanel;
+        private readonly Dictionary<string, ListCard> _locationCards = new Dictionary<string, ListCard>();
+        private readonly Dictionary<string, WorldLocationCategory> _categoryLookup = new Dictionary<string, WorldLocationCategory>();
+        private string _selectedLocationKey;
+        private string _selectedCategoryId;
 
         private LocationEditorWindow _editorWindow;
         private LocationInfoWindow _presetInfoWindow;
@@ -53,55 +71,32 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _presetService = presetService;
         }
 
-        #region Public Methods
+        #region Build
 
         protected override void Build(Container buildPanel)
         {
             _buildPanel = buildPanel;
+            InitializeSelectedLocationKey();
+            BuildDisplaySettingsPanel(buildPanel);
+            BuildWindowHelpSection(buildPanel);
+            BuildLocationSection(buildPanel);
+            SubscribeToEvents();
+            UpdateVisibility();
+        }
 
+        private void BuildDisplaySettingsPanel(Container parent)
+        {
             var displaySettingsPanel = new Panel
             {
                 ShowBorder = true,
                 Title = "Display Settings",
-                Size = new Point(buildPanel.Width - 70, 120),
+                Size = new Point(parent.Width - 70, 120),
                 Location = new Point(23, 10),
-                Parent = buildPanel
+                Parent = parent
             };
 
             BuildDisplayModeSection(displaySettingsPanel);
-
-            _windowHelpSection = new Panel
-            {
-                ShowBorder = true,
-                Title = "Window Controls",
-                Size = new Point(buildPanel.Width - 70, 130),
-                Location = new Point(23, 140),
-                Parent = buildPanel
-            };
-            BuildWindowHelpSection();
-
-            _locationSection = new Panel
-            {
-                ShowBorder = true,
-                Size = new Point(buildPanel.Width - 70, buildPanel.Height - 280),
-                Location = new Point(23, 140),
-                Parent = buildPanel
-            };
-
-            BuildLocationSection();
-            UpdateVisibility();
-
-            _savedLocationsChangedHandler = (s, e) => RebuildLocationCards();
-            _settings.SavedLocationsChanged += _savedLocationsChangedHandler;
-            _presetsLoadedHandler = (s, e) => RebuildLocationCards();
-            _presetService.PresetsLoaded += _presetsLoadedHandler;
-            _parentResizedHandler = (s, e) => UpdateSectionSizes();
-            buildPanel.Resized += _parentResizedHandler;
         }
-
-        #endregion
-
-        #region Private Methods
 
         private void BuildDisplayModeSection(Container parent)
         {
@@ -122,23 +117,20 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _enabledSettingChangedHandler = (s, e) =>
             {
                 if (_enabledCheckbox.Checked != e.NewValue)
-                {
                     _enabledCheckbox.Checked = e.NewValue;
-                }
             };
             _cinemaSettings.EnabledSetting.SettingChanged += _enabledSettingChangedHandler;
 
             _displayModeDropdown = new Dropdown
             {
                 Width = 160,
-                Location = new Point(150, 13),
+                Location = new Point(120, 13),
                 Parent = parent
             };
 
-            foreach (var mode in Enum.GetValues(typeof(CinemaDisplayMode)))
-            {
-                _displayModeDropdown.Items.Add(GetDisplayModeName((CinemaDisplayMode)mode));
-            }
+            _displayModeDropdown.Items.Add(GetDisplayModeName(CinemaDisplayMode.InGame));
+            _displayModeDropdown.Items.Add(GetDisplayModeName(CinemaDisplayMode.OnScreen));
+
             _displayModeDropdown.SelectedItem = GetDisplayModeName(_settings.DisplayMode);
 
             _displayModeDropdown.ValueChanged += (s, e) =>
@@ -147,11 +139,31 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 _settings.DisplayMode = selectedMode;
                 UpdateVisibility();
             };
+
+            new Label
+            {
+                Text = "In-Game World: 3D Video displayed at in-game, press '+ Add New' to start\n" +
+                       "On-Screen Window: A draggable, resizable overlay window",
+                AutoSizeHeight = true,
+                AutoSizeWidth = true,
+                Location = new Point(300, 10),
+                TextColor = Color.LightGray,
+                Parent = parent
+            };
         }
 
-        private void BuildWindowHelpSection()
+        private void BuildWindowHelpSection(Container parent)
         {
-            var helpText = new Label
+            _windowHelpSection = new Panel
+            {
+                ShowBorder = true,
+                Title = "Window Controls",
+                Size = new Point(parent.Width - 70, 130),
+                Location = new Point(23, 140),
+                Parent = parent
+            };
+
+            new Label
             {
                 Text = "• Drag anywhere on the video to move the window\n" +
                        "• Drag the corners or edges to resize\n" +
@@ -164,191 +176,433 @@ namespace CinemaHUD.UI.Windows.MainSettings
             };
         }
 
-        private void BuildLocationSection()
+        private void BuildLocationSection(Container parent)
         {
-            var headerPanel = new Panel
+            _locationSection = new Panel
             {
-                Size = new Point(_locationSection.ContentRegion.Width, 36),
+                ShowBorder = false,
+                Size = new Point(parent.Width - 70, parent.Height - 280),
+                Location = new Point(23, 140),
+                Parent = parent
+            };
+
+            BuildCategoryMenu();
+            BuildContentPanel();
+            PopulateCategoryMenu();
+            SelectInitialCategory();
+        }
+
+        private void BuildCategoryMenu()
+        {
+            _menuPanel = new Panel
+            {
+                ShowBorder = true,
+                Size = new Point(MenuPanelWidth, _locationSection.Height),
                 Location = new Point(0, 0),
-                BackgroundTexture = CinemaModule.CinemaModule.Instance.TextureService.GetCardBackground(),
+                Title = "Categories",
+                Parent = _locationSection,
+                CanScroll = true
+            };
+
+            _categoryMenu = new Menu
+            {
+                Size = _menuPanel.ContentRegion.Size,
+                MenuItemHeight = 50,
+                Parent = _menuPanel,
+                CanSelect = true
+            };
+
+            _categoryMenu.ItemSelected += OnCategorySelected;
+        }
+
+        private void BuildContentPanel()
+        {
+            _contentContainer = new Panel
+            {
+                Size = new Point(_locationSection.Width - MenuPanelWidth - 6, _locationSection.Height),
+                Location = new Point(MenuPanelWidth + 6, 0),
+                ShowBorder = true,
                 Parent = _locationSection
             };
 
-            new Label
+            _headerSection = new Panel
             {
-                Text = "Locations",
-                Font = GameService.Content.DefaultFont18,
-                AutoSizeWidth = true,
+                WidthSizingMode = SizingMode.Fill,
+                Height = 0,
+                Parent = _contentContainer
+            };
+
+            _cardsPanel = new FlowPanel
+            {
+                FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                Size = new Point(_contentContainer.ContentRegion.Width, _contentContainer.ContentRegion.Height),
+                Location = new Point(0, 0),
+                ControlPadding = new Vector2(0, CardVerticalSpacing),
+                CanScroll = true,
+                Parent = _contentContainer
+            };
+        }
+
+        #endregion
+
+        #region Category Menu
+
+        private void PopulateCategoryMenu()
+        {
+            _categoryMenu.ClearChildren();
+            _categoryLookup.Clear();
+
+            var myLocationsItem = _categoryMenu.AddMenuItem(CategoryMyLocations);
+            myLocationsItem.Icon = CinemaModule.CinemaModule.Instance.TextureService.GetEmblem();
+
+            foreach (var category in _presetService.WorldLocationCategories)
+            {
+                var menuItem = _categoryMenu.AddMenuItem(category.Name);
+                menuItem.Icon = category.IconTexture;
+                _categoryLookup[category.Name] = category;
+            }
+        }
+
+        private void SelectInitialCategory()
+        {
+            string initialCategory = DetermineInitialCategory();
+            var menuItem = _categoryMenu.Children
+                .OfType<MenuItem>()
+                .FirstOrDefault(m => m.Text == initialCategory);
+
+            if (menuItem != null)
+                _categoryMenu.Select(menuItem);
+        }
+
+        private string DetermineInitialCategory()
+        {
+            var lastCategory = _settings.LastSelectedLocationCategory;
+            if (!string.IsNullOrEmpty(lastCategory) &&
+                (_categoryLookup.ContainsKey(lastCategory) || lastCategory == CategoryMyLocations))
+            {
+                return lastCategory;
+            }
+
+            return _presetService.WorldLocationCategories.FirstOrDefault()?.Name ?? CategoryMyLocations;
+        }
+
+        private void OnCategorySelected(object sender, ControlActivatedEventArgs e)
+        {
+            if (e.ActivatedControl is MenuItem menuItem)
+            {
+                _selectedCategoryId = menuItem.Text;
+                _settings.LastSelectedLocationCategory = _selectedCategoryId;
+                RefreshContent();
+            }
+        }
+
+        private void ReselectCurrentCategory()
+        {
+            if (string.IsNullOrEmpty(_selectedCategoryId))
+                return;
+
+            var menuItem = _categoryMenu.Children
+                .OfType<MenuItem>()
+                .FirstOrDefault(m => m.Text == _selectedCategoryId);
+
+            if (menuItem != null)
+                _categoryMenu.Select(menuItem);
+        }
+
+        #endregion
+
+        #region Content Loading
+
+        private void RefreshContent()
+        {
+            _locationCards.Clear();
+            _headerSection.ClearChildren();
+            _headerSection.Height = 0;
+            _cardsPanel.ClearChildren();
+            UpdateCardsPanelLayout();
+
+            if (_selectedCategoryId == CategoryMyLocations)
+                LoadMyLocationsContent();
+            else if (_categoryLookup.TryGetValue(_selectedCategoryId, out var category))
+                LoadCategoryContent(category);
+        }
+
+        private void LoadCategoryContent(WorldLocationCategory category)
+        {
+            BuildCategoryHeader(category);
+
+            if (category.Locations.Count == 0)
+            {
+                ShowEmptyMessage("No locations available in this category");
+                return;
+            }
+
+            foreach (var location in category.Locations)
+                CreatePresetLocationCard(location);
+        }
+
+        private void LoadMyLocationsContent()
+        {
+            BuildMyLocationsToolbar();
+
+            var savedLocations = _settings.SavedLocations.Locations;
+            if (savedLocations.Count == 0)
+            {
+                ShowEmptyMessage("No custom locations. Click '+ Add New' to create one.");
+                return;
+            }
+
+            foreach (var location in savedLocations)
+                CreateSavedLocationCard(location);
+        }
+
+        private void BuildCategoryHeader(WorldLocationCategory category)
+        {
+            if (string.IsNullOrEmpty(category.Description))
+                return;
+
+            const int margin = 10;
+            var headerPanel = new Panel { WidthSizingMode = SizingMode.Fill, Parent = _headerSection };
+
+            var descLabel = new Label
+            {
+                Text = category.Description,
+                Width = Math.Max(_contentContainer.Width - 40, 100),
                 AutoSizeHeight = true,
-                Location = new Point(10, 8),
+                WrapText = true,
+                TextColor = Color.LightGray,
+                Font = GameService.Content.DefaultFont14,
+                Left = margin,
+                Top = margin,
                 Parent = headerPanel
             };
 
-            var addButton = new StandardButton
+            headerPanel.Height = Math.Max(descLabel.Height + (margin * 2), 46);
+            _headerSection.Height = headerPanel.Height;
+            UpdateCardsPanelLayout();
+        }
+
+        private void BuildMyLocationsToolbar()
+        {
+            _headerSection.Height = 40;
+            var toolbar = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _headerSection };
+
+            new Label
             {
-                Text = "+ Add New",
-                Width = 100,
-                Parent = headerPanel
+                Text = "Create your own screen locations",
+                AutoSizeHeight = true,
+                AutoSizeWidth = true,
+                TextColor = Color.Gray,
+                Left = 10,
+                Top = 12,
+                Parent = toolbar
             };
-            addButton.Location = new Point(headerPanel.Width - addButton.Width - 10, 5);
-            addButton.Click += (s, e) => OpenEditorForNewLocation();
 
             var importButton = new GlowButton
             {
                 Icon = CinemaModule.CinemaModule.Instance.TextureService.GetImportIcon(),
                 Size = new Point(30, 26),
                 BasicTooltipText = "Import from Clipboard",
-                Parent = headerPanel
+                Left = _contentContainer.Width - 145,
+                Top = 7,
+                Parent = toolbar
             };
-            importButton.Location = new Point(addButton.Location.X - importButton.Width - 5, 7);
             importButton.Click += (s, e) => ImportLocationFromClipboard();
 
-            _locationsContainer = new FlowPanel
+            var addButton = new StandardButton
             {
-                FlowDirection = ControlFlowDirection.SingleTopToBottom,
-                Size = new Point(_locationSection.ContentRegion.Width, _locationSection.ContentRegion.Height - 50),
-                Location = new Point(0, 46),
-                ControlPadding = new Vector2(0, 4),
-                CanScroll = true,
-                Parent = _locationSection
+                Text = "+ Add New",
+                Width = 100,
+                Left = _contentContainer.Width - 110,
+                Top = 5,
+                Parent = toolbar
             };
+            addButton.Click += (s, e) => OpenEditorForNewLocation();
 
-            RebuildLocationCards();
+            UpdateCardsPanelLayout();
         }
 
-        private void RebuildLocationCards()
+        private void UpdateCardsPanelLayout()
         {
-            _locationsContainer?.ClearChildren();
-            _locationCards.Clear();
-
-            var presets = _presetService.WorldLocationPresets;
-            Logger.Debug($"RebuildLocationCards: Found {presets.Count} preset locations, IsLoaded={_presetService.IsLoaded}");
-            foreach (var preset in presets)
-            {
-                CreatePresetListItem(preset);
-            }
-
-            var savedLocations = _settings.SavedLocations;
-            foreach (var location in savedLocations.Locations)
-            {
-                CreateSavedLocationListItem(location);
-            }
-
-            if (_locationCards.Count == 0)
-            {
-                new Label
-                {
-                    Text = "No locations available. Click '+ Add New' to create one.",
-                    AutoSizeHeight = true,
-                    AutoSizeWidth = true,
-                    TextColor = Color.Gray,
-                    Parent = _locationsContainer
-                };
-            }
+            _cardsPanel.Location = new Point(0, _headerSection.Height);
+            _cardsPanel.Height = _contentContainer.ContentRegion.Height - _headerSection.Height;
         }
 
-        private void CreatePresetListItem(WorldLocationPresetData preset)
+        private void ShowEmptyMessage(string message)
         {
-            bool isSelected = _settings.SelectedPresetLocationId == preset.Id && 
-                              string.IsNullOrEmpty(_settings.SelectedSavedLocationId);
+            var container = new Panel { WidthSizingMode = SizingMode.Fill, Height = 40, Parent = _cardsPanel };
+            new Label
+            {
+                Text = message,
+                AutoSizeHeight = true,
+                AutoSizeWidth = true,
+                TextColor = Color.Gray,
+                Left = 10,
+                Top = 12,
+                Parent = container
+            };
+        }
+
+        #endregion
+
+        #region Location Cards
+
+        private void CreatePresetLocationCard(WorldLocationPresetData preset)
+        {
+            string key = $"{KeyPrefixPreset}{preset.Id}";
+            bool isSelected = key == _selectedLocationKey;
 
             var position = preset.Position;
             var mapId = position?.MapId ?? 0;
 
             var buttons = new List<ListCardButton>
             {
-                new ListCardButton 
-                { 
-                    Text = "", 
-                    Width = 30, 
+                new ListCardButton
+                {
+                    Text = "",
+                    Width = 30,
                     Icon = CinemaModule.CinemaModule.Instance.TextureService.GetInfoIcon(),
                     Tooltip = "View Details",
-                    OnClick = () => ShowPresetInfo(preset) 
+                    OnClick = () => ShowPresetInfo(preset)
                 }
             };
 
+            if (!string.IsNullOrEmpty(preset.Waypoint))
+            {
+                buttons.Insert(0, new ListCardButton
+                {
+                    Text = "",
+                    Width = 30,
+                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetWaypointIcon(),
+                    Tooltip = "Copy Waypoint",
+                    OnClick = () => CopyWaypointToClipboard(preset.Waypoint)
+                });
+            }
+
             var card = new ListCard(
-                _locationsContainer,
+                _cardsPanel,
                 $"{preset.Name} - Map {mapId}",
-                string.Empty,
+                preset.Description ?? string.Empty,
                 isSelected,
-                textPanelWidth: 350,
+                textPanelWidth: 220,
                 buttons: buttons);
 
-            _locationCards["preset_" + preset.Id] = card;
+            _locationCards[key] = card;
 
-            card.Click += (s, e) =>
-            {
-                _controller.SelectPresetLocation(preset.Id, preset.Position, preset.ScreenWidth);
-                UpdateCardSelection();
-            };
+            card.Click += (s, e) => SelectPresetLocation(preset, key);
 
             UpdateCardMapName(card, mapId);
-            
+
             if (preset.AvatarTexture != null)
-            {
                 card.SetAvatar(preset.AvatarTexture);
-            }
         }
 
-        private void CreateSavedLocationListItem(SavedLocation location)
+        private void CreateSavedLocationCard(SavedLocation location)
         {
-            bool isSelected = _settings.SelectedSavedLocationId == location.Id;
+            string key = $"{KeyPrefixSaved}{location.Id}";
+            bool isSelected = key == _selectedLocationKey;
+
             var position = location.Position;
             var mapId = position?.MapId ?? 0;
 
             var buttons = new List<ListCardButton>
             {
-                new ListCardButton 
-                { 
-                    Text = "", 
-                    Width = 30, 
+                new ListCardButton
+                {
+                    Text = "",
+                    Width = 30,
                     Icon = CinemaModule.CinemaModule.Instance.TextureService.GetDeleteIcon(),
                     Tooltip = "Delete",
-                    OnClick = () => DeleteLocation(location) 
+                    OnClick = () => DeleteLocation(location)
                 },
-                new ListCardButton 
-                { 
-                    Text = "", 
-                    Width = 30, 
+                new ListCardButton
+                {
+                    Text = "",
+                    Width = 30,
                     Icon = CinemaModule.CinemaModule.Instance.TextureService.GetExportIcon(),
                     Tooltip = "Export to Clipboard",
-                    OnClick = () => ExportLocationToClipboard(location) 
+                    OnClick = () => ExportLocationToClipboard(location)
                 },
                 new ListCardButton { Text = "Edit", Width = 50, Tooltip = "Edit Location", OnClick = () => OpenEditorForLocation(location) }
             };
 
             var card = new ListCard(
-                _locationsContainer,
+                _cardsPanel,
                 $"{location.Name ?? "Unnamed"} - Map {mapId}",
                 string.Empty,
                 isSelected,
-                textPanelWidth: 260,
+                textPanelWidth: 220,
                 buttons: buttons);
 
-            _locationCards["saved_" + location.Id] = card;
+            _locationCards[key] = card;
 
-            card.Click += (s, e) =>
-            {
-                _controller.SelectSavedLocation(location.Id);
-                UpdateCardSelection();
-            };
+            card.Click += (s, e) => SelectSavedLocation(location, key);
 
             UpdateCardMapName(card, mapId);
 
             var avatarTexture = CinemaModule.CinemaModule.Instance.TextureService.GetDefaultAvatar();
             if (avatarTexture != null)
-            {
                 card.SetAvatar(avatarTexture);
+        }
+
+        #endregion
+
+        #region Selection
+
+        private void InitializeSelectedLocationKey()
+        {
+            if (!string.IsNullOrEmpty(_settings.SelectedSavedLocationId))
+            {
+                _selectedLocationKey = $"{KeyPrefixSaved}{_settings.SelectedSavedLocationId}";
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(_settings.SelectedPresetLocationId))
+                _selectedLocationKey = $"{KeyPrefixPreset}{_settings.SelectedPresetLocationId}";
+        }
+
+        private void SelectPresetLocation(WorldLocationPresetData preset, string key)
+        {
+            _selectedLocationKey = key;
+            _controller.SelectPresetLocation(preset.Id, preset.Position, preset.ScreenWidth);
+            UpdateCardSelection();
+        }
+
+        private void SelectSavedLocation(SavedLocation location, string key)
+        {
+            _selectedLocationKey = key;
+            _controller.SelectSavedLocation(location.Id);
+            UpdateCardSelection();
+        }
+
+        private void UpdateCardSelection()
+        {
+            foreach (var kvp in _locationCards)
+                kvp.Value.IsSelected = kvp.Key == _selectedLocationKey;
+        }
+
+        #endregion
+
+        #region Actions
+
+        private void CopyWaypointToClipboard(string waypoint)
+        {
+            if (string.IsNullOrEmpty(waypoint)) return;
+            try
+            {
+                ClipboardUtil.WindowsClipboardService.SetTextAsync(waypoint);
+                ScreenNotification.ShowNotification("Waypoint copied!", ScreenNotification.NotificationType.Info);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"Failed to copy waypoint to clipboard: {ex.Message}");
             }
         }
 
         private LocationEditorWindow GetOrCreateEditorWindow()
         {
             if (_editorWindow == null)
-            {
                 _editorWindow = new LocationEditorWindow(_settings, _controller);
-            }
             return _editorWindow;
         }
 
@@ -424,32 +678,32 @@ namespace CinemaHUD.UI.Windows.MainSettings
             }
         }
 
-        private void UpdateCardSelection()
+        private void ShowPresetInfo(WorldLocationPresetData preset)
         {
-            foreach (var kvp in _locationCards)
-            {
-                if (kvp.Key.StartsWith("preset_"))
-                {
-                    var presetId = kvp.Key.Substring(7);
-                    kvp.Value.IsSelected = presetId == _settings.SelectedPresetLocationId && 
-                                           string.IsNullOrEmpty(_settings.SelectedSavedLocationId);
-                }
-                else if (kvp.Key.StartsWith("saved_"))
-                {
-                    var savedId = kvp.Key.Substring(6);
-                    kvp.Value.IsSelected = savedId == _settings.SelectedSavedLocationId;
-                }
-            }
+            var infoWindow = GetOrCreatePresetInfoWindow();
+            infoWindow.ShowPreset(preset);
         }
+
+        private LocationInfoWindow GetOrCreatePresetInfoWindow()
+        {
+            if (_presetInfoWindow == null)
+            {
+                var bgTexture = CinemaModule.CinemaModule.Instance.TextureService.GetSmallWindowBackground();
+                _presetInfoWindow = new LocationInfoWindow(bgTexture);
+            }
+            return _presetInfoWindow;
+        }
+
+        #endregion
+
+        #region Visibility
 
         private void UpdateVisibility()
         {
             bool isEnabled = _cinemaSettings.IsEnabled;
 
             if (_displayModeDropdown != null)
-            {
                 _displayModeDropdown.Enabled = isEnabled;
-            }
 
             if (_windowHelpSection == null || _locationSection == null) return;
 
@@ -457,12 +711,23 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _locationSection.Visible = isEnabled && _settings.DisplayMode == CinemaDisplayMode.InGame;
         }
 
-        private void UpdateSectionSizes()
-        {
-            if (_buildPanel == null || _locationSection == null || _locationsContainer == null) return;
+        #endregion
 
-            _locationSection.Size = new Point(_buildPanel.Width - 70, _buildPanel.Height - 280);
-            _locationsContainer.Size = new Point(_locationSection.ContentRegion.Width, _locationSection.ContentRegion.Height - 50);
+        #region Helpers
+
+        private async void UpdateCardMapName(ListCard card, int mapId)
+        {
+            if (mapId <= 0) return;
+
+            var mapName = await _mapService.GetMapNameAsync(mapId);
+            var currentTitle = card.Title;
+            var dashIndex = currentTitle.LastIndexOf(" - ");
+
+            if (dashIndex > 0)
+            {
+                var namePrefix = currentTitle.Substring(0, dashIndex);
+                card.Title = $"{namePrefix} - {mapName}";
+            }
         }
 
         private CinemaDisplayMode ParseDisplayMode(string name)
@@ -485,35 +750,41 @@ namespace CinemaHUD.UI.Windows.MainSettings
             }
         }
 
-        private async void UpdateCardMapName(ListCard card, int mapId)
-        {
-            if (mapId <= 0) return;
+        #endregion
 
-            var mapName = await _mapService.GetMapNameAsync(mapId);
-            var currentTitle = card.Title;
-            var dashIndex = currentTitle.LastIndexOf(" - ");
-            
-            if (dashIndex > 0)
+        #region Events
+
+        private void SubscribeToEvents()
+        {
+            _savedLocationsChangedHandler = (s, e) =>
             {
-                var namePrefix = currentTitle.Substring(0, dashIndex);
-                card.Title = $"{namePrefix} - {mapName}";
-            }
+                if (_selectedCategoryId == CategoryMyLocations)
+                    RefreshContent();
+            };
+            _settings.SavedLocationsChanged += _savedLocationsChangedHandler;
+
+            _presetsLoadedHandler = (s, e) =>
+            {
+                PopulateCategoryMenu();
+                ReselectCurrentCategory();
+                RefreshContent();
+            };
+            _presetService.PresetsLoaded += _presetsLoadedHandler;
+
+            _parentResizedHandler = (s, e) => UpdateSectionSizes();
+            _buildPanel.Resized += _parentResizedHandler;
         }
 
-        private void ShowPresetInfo(WorldLocationPresetData preset)
+        private void UpdateSectionSizes()
         {
-            var infoWindow = GetOrCreatePresetInfoWindow();
-            infoWindow.ShowPreset(preset);
-        }
+            if (_buildPanel == null || _locationSection == null) return;
 
-        private LocationInfoWindow GetOrCreatePresetInfoWindow()
-        {
-            if (_presetInfoWindow == null)
-            {
-                var bgTexture = CinemaModule.CinemaModule.Instance.TextureService.GetSmallWindowBackground();
-                _presetInfoWindow = new LocationInfoWindow(bgTexture);
-            }
-            return _presetInfoWindow;
+            _locationSection.Size = new Point(_buildPanel.Width - 70, _buildPanel.Height - 280);
+            _menuPanel.Height = _locationSection.Height;
+            _categoryMenu.Height = _menuPanel.ContentRegion.Height;
+            _contentContainer.Size = new Point(_locationSection.Width - MenuPanelWidth - 6, _locationSection.Height);
+            _cardsPanel.Width = _contentContainer.ContentRegion.Width;
+            UpdateCardsPanelLayout();
         }
 
         #endregion
@@ -525,10 +796,11 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _settings.SavedLocationsChanged -= _savedLocationsChangedHandler;
             _presetService.PresetsLoaded -= _presetsLoadedHandler;
             _cinemaSettings.EnabledSetting.SettingChanged -= _enabledSettingChangedHandler;
+            _categoryMenu.ItemSelected -= OnCategorySelected;
+
             if (_buildPanel != null)
-            {
                 _buildPanel.Resized -= _parentResizedHandler;
-            }
+
             _editorWindow?.Dispose();
             _presetInfoWindow?.Dispose();
             base.Unload();
