@@ -1,12 +1,12 @@
 using Blish_HUD;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CinemaModule.Services
+namespace CinemaModule.Services.Twitch
 {
     public class TwitchAuthService : IDisposable
     {
@@ -17,12 +17,14 @@ namespace CinemaModule.Services
         private const string TwitchValidateUrl = "https://id.twitch.tv/oauth2/validate";
         private const string TwitchRevokeUrl = "https://id.twitch.tv/oauth2/revoke";
 
-        private const string ClientId = "8m7h0mxthjx16qofx82mruz640ke67";
+        public const string ClientId = "8m7h0mxthjx16qofx82mruz640ke67";
         private const string Scopes = "user:read:subscriptions user:read:follows chat:read chat:edit";
         private const int PollIntervalMs = 5000;
         private const int DeviceCodeExpirySeconds = 1800;
+        private static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(30);
 
         private readonly HttpClient _httpClient;
+        private readonly object _pollLock = new object();
         private CancellationTokenSource _pollCts;
 
         public event EventHandler<TwitchAuthStatusEventArgs> AuthStatusChanged;
@@ -36,7 +38,7 @@ namespace CinemaModule.Services
 
         public TwitchAuthService()
         {
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient { Timeout = HttpTimeout };
         }
 
         public void LoadTokens(string accessToken, string refreshToken)
@@ -52,12 +54,17 @@ namespace CinemaModule.Services
 
         public async Task StartDeviceAuthFlowAsync()
         {
-            CancelPendingAuth();
-            _pollCts = new CancellationTokenSource();
+            CancellationToken cancellationToken;
+            lock (_pollLock)
+            {
+                CancelPendingAuthInternal();
+                _pollCts = new CancellationTokenSource();
+                cancellationToken = _pollCts.Token;
+            }
 
             try
             {
-                var deviceCode = await RequestDeviceCodeAsync();
+                var deviceCode = await RequestDeviceCodeAsync().ConfigureAwait(false);
                 if (deviceCode == null)
                 {
                     RaiseAuthStatus(TwitchAuthStatus.Failed, "Failed to get device code");
@@ -70,7 +77,7 @@ namespace CinemaModule.Services
 
                 RaiseAuthStatus(TwitchAuthStatus.WaitingForUser, $"Enter code: {deviceCode.UserCode}");
 
-                await PollForTokenAsync(deviceCode.DeviceCode, _pollCts.Token);
+                await PollForTokenAsync(deviceCode.DeviceCode, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -84,6 +91,14 @@ namespace CinemaModule.Services
         }
 
         public void CancelPendingAuth()
+        {
+            lock (_pollLock)
+            {
+                CancelPendingAuthInternal();
+            }
+        }
+
+        private void CancelPendingAuthInternal()
         {
             _pollCts?.Cancel();
             _pollCts?.Dispose();
@@ -101,11 +116,11 @@ namespace CinemaModule.Services
                 {
                     request.Headers.Add("Authorization", $"OAuth {AccessToken}");
 
-                    var response = await _httpClient.SendAsync(request);
+                    var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        var content = await response.Content.ReadAsStringAsync();
+                        var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         var json = JObject.Parse(content);
                         Username = json["login"]?.ToString();
                         UserId = json["user_id"]?.ToString();
@@ -118,7 +133,7 @@ namespace CinemaModule.Services
                     if ((int)response.StatusCode == 401)
                     {
                         Logger.Info("Twitch token expired, attempting refresh");
-                        return await RefreshTokenAsync();
+                        return await RefreshTokenAsync().ConfigureAwait(false);
                     }
                 }
             }
@@ -142,24 +157,22 @@ namespace CinemaModule.Services
 
             try
             {
-                var content = new FormUrlEncodedContent(new[]
-                {
-                    new System.Collections.Generic.KeyValuePair<string, string>("grant_type", "refresh_token"),
-                    new System.Collections.Generic.KeyValuePair<string, string>("refresh_token", RefreshToken),
-                    new System.Collections.Generic.KeyValuePair<string, string>("client_id", ClientId)
-                });
+                var content = CreateFormContent(
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", RefreshToken),
+                    ("client_id", ClientId));
 
-                var response = await _httpClient.PostAsync(TwitchTokenUrl, content);
+                var response = await _httpClient.PostAsync(TwitchTokenUrl, content).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     var json = JObject.Parse(responseContent);
 
                     AccessToken = json["access_token"]?.ToString();
                     RefreshToken = json["refresh_token"]?.ToString();
 
-                    await ValidateTokenAsync();
+                    await ValidateTokenAsync().ConfigureAwait(false);
                     return true;
                 }
 
@@ -183,13 +196,11 @@ namespace CinemaModule.Services
             {
                 try
                 {
-                    var content = new FormUrlEncodedContent(new[]
-                    {
-                        new System.Collections.Generic.KeyValuePair<string, string>("client_id", ClientId),
-                        new System.Collections.Generic.KeyValuePair<string, string>("token", AccessToken)
-                    });
+                    var content = CreateFormContent(
+                        ("client_id", ClientId),
+                        ("token", AccessToken));
 
-                    await _httpClient.PostAsync(TwitchRevokeUrl, content);
+                    await _httpClient.PostAsync(TwitchRevokeUrl, content).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -205,22 +216,20 @@ namespace CinemaModule.Services
         {
             try
             {
-                var content = new FormUrlEncodedContent(new[]
-                {
-                    new System.Collections.Generic.KeyValuePair<string, string>("client_id", ClientId),
-                    new System.Collections.Generic.KeyValuePair<string, string>("scopes", Scopes)
-                });
+                var content = CreateFormContent(
+                    ("client_id", ClientId),
+                    ("scopes", Scopes));
 
-                var response = await _httpClient.PostAsync(TwitchDeviceAuthUrl, content);
-                
+                var response = await _httpClient.PostAsync(TwitchDeviceAuthUrl, content).ConfigureAwait(false);
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    var error = await response.Content.ReadAsStringAsync();
+                    var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     Logger.Warn($"Failed to get device code: {error}");
                     return null;
                 }
 
-                var responseContent = await response.Content.ReadAsStringAsync();
+                var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var json = JObject.Parse(responseContent);
 
                 return new DeviceCodeResponse
@@ -252,13 +261,13 @@ namespace CinemaModule.Services
                     return;
                 }
 
-                await Task.Delay(PollIntervalMs, cancellationToken);
+                await Task.Delay(PollIntervalMs, cancellationToken).ConfigureAwait(false);
 
-                var tokenResult = await TryGetTokenAsync(deviceCode);
-                
+                var tokenResult = await TryGetTokenAsync(deviceCode).ConfigureAwait(false);
+
                 if (tokenResult == TokenPollResult.Success)
                 {
-                    await ValidateTokenAsync();
+                    await ValidateTokenAsync().ConfigureAwait(false);
                     return;
                 }
 
@@ -274,16 +283,14 @@ namespace CinemaModule.Services
         {
             try
             {
-                var content = new FormUrlEncodedContent(new[]
-                {
-                    new System.Collections.Generic.KeyValuePair<string, string>("client_id", ClientId),
-                    new System.Collections.Generic.KeyValuePair<string, string>("scopes", Scopes),
-                    new System.Collections.Generic.KeyValuePair<string, string>("device_code", deviceCode),
-                    new System.Collections.Generic.KeyValuePair<string, string>("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
-                });
+                var content = CreateFormContent(
+                    ("client_id", ClientId),
+                    ("scopes", Scopes),
+                    ("device_code", deviceCode),
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"));
 
-                var response = await _httpClient.PostAsync(TwitchTokenUrl, content);
-                var responseContent = await response.Content.ReadAsStringAsync();
+                var response = await _httpClient.PostAsync(TwitchTokenUrl, content).ConfigureAwait(false);
+                var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var json = JObject.Parse(responseContent);
 
                 if (response.IsSuccessStatusCode)
@@ -294,13 +301,13 @@ namespace CinemaModule.Services
                 }
 
                 var error = json["message"]?.ToString() ?? json["error"]?.ToString();
-                
+
                 if (error == "authorization_pending")
                     return TokenPollResult.Pending;
 
                 if (error == "slow_down")
                 {
-                    await Task.Delay(PollIntervalMs);
+                    await Task.Delay(PollIntervalMs).ConfigureAwait(false);
                     return TokenPollResult.Pending;
                 }
 
@@ -325,6 +332,16 @@ namespace CinemaModule.Services
         private void RaiseAuthStatus(TwitchAuthStatus status, string message)
         {
             AuthStatusChanged?.Invoke(this, new TwitchAuthStatusEventArgs(status, message, Username, UserId, AccessToken, RefreshToken));
+        }
+
+        private static FormUrlEncodedContent CreateFormContent(params (string key, string value)[] pairs)
+        {
+            var content = new List<KeyValuePair<string, string>>(pairs.Length);
+            foreach (var (key, value) in pairs)
+            {
+                content.Add(new KeyValuePair<string, string>(key, value));
+            }
+            return new FormUrlEncodedContent(content);
         }
 
         public void Dispose()

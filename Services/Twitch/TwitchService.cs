@@ -1,17 +1,15 @@
 using Blish_HUD;
-using Blish_HUD.Content;
-using CinemaModule.Models;
+using CinemaModule.Models.Twitch;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace CinemaModule.Services
+namespace CinemaModule.Services.Twitch
 {
     public class TwitchService : IDisposable
     {
@@ -20,12 +18,9 @@ namespace CinemaModule.Services
         private const string TwitchGqlUrl = "https://gql.twitch.tv/gql";
         private const string TwitchHelixUrl = "https://api.twitch.tv/helix";
         private const string TwitchClientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
-        private const string TwitchAuthClientId = "8m7h0mxthjx16qofx82mruz640ke67";
         private const string TwitchUsherUrl = "https://usher.ttvnw.net/api/channel/hls";
-        private const string AvatarCacheSubfolder = "avatars";
 
         private readonly HttpClient _httpClient;
-        private readonly ImageCacheService _imageCache;
 
         private List<TwitchStreamQuality> _cachedQualities = new List<TwitchStreamQuality>();
         private string _cachedQualitiesChannel;
@@ -37,15 +32,11 @@ namespace CinemaModule.Services
         public event EventHandler<TwitchQualitiesEventArgs> QualitiesChanged;
         public event EventHandler ScopeError;
 
-        public ImageCacheService ImageCache => _imageCache;
         public bool IsAuthenticated => !string.IsNullOrEmpty(_authToken);
 
-        public TwitchService(string cacheDirectory)
+        public TwitchService()
         {
             _httpClient = new HttpClient();
-
-            var avatarCacheDir = Path.Combine(cacheDirectory, AvatarCacheSubfolder);
-            _imageCache = new ImageCacheService(avatarCacheDir, _httpClient);
         }
 
         public void SetAuthToken(string token, string userId = null)
@@ -132,7 +123,7 @@ namespace CinemaModule.Services
 
             using (var request = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                request.Headers.Add("Client-ID", TwitchAuthClientId);
+                request.Headers.Add("Client-ID", TwitchAuthService.ClientId);
                 request.Headers.Add("Authorization", $"Bearer {_authToken}");
 
                 var response = await _httpClient.SendAsync(request);
@@ -172,7 +163,7 @@ namespace CinemaModule.Services
 
             using (var request = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                request.Headers.Add("Client-ID", TwitchAuthClientId);
+                request.Headers.Add("Client-ID", TwitchAuthService.ClientId);
                 request.Headers.Add("Authorization", $"Bearer {_authToken}");
 
                 var response = await _httpClient.SendAsync(request);
@@ -282,7 +273,6 @@ namespace CinemaModule.Services
 
         public IReadOnlyList<TwitchStreamQuality> CachedQualities => _cachedQualities;
 
-
         public async void FetchAndCacheQualitiesAsync(string channelName)
         {
             if (_isFetchingQualities)
@@ -331,6 +321,9 @@ namespace CinemaModule.Services
 
             _selectedQualityIndex = qualityIndex;
             var selectedQuality = _cachedQualities[qualityIndex];
+
+            var qualityNames = _cachedQualities.Select(q => q.DisplayName).ToList();
+            QualitiesChanged?.Invoke(this, new TwitchQualitiesEventArgs(qualityNames, _selectedQualityIndex));
 
             return selectedQuality.StreamUrl;
         }
@@ -457,7 +450,6 @@ namespace CinemaModule.Services
             return match.Success ? int.Parse(match.Groups[1].Value) : 0;
         }
 
-
         private async Task<StreamAccessToken> GetStreamAccessTokenAsync(string channelName)
         {
             var query = BuildPlaybackAccessTokenQuery(channelName);
@@ -543,11 +535,6 @@ namespace CinemaModule.Services
             {
                 return new UrlAvailabilityResult { IsAvailable = null, StatusMessage = "Unknown" };
             }
-        }
-
-        public async Task<AsyncTexture2D> GetAvatarTextureAsync(string cacheKey, string avatarUrl)
-        {
-            return await _imageCache.GetImageAsync(cacheKey, avatarUrl);
         }
 
         private JObject BuildStreamInfoQuery(string channelName)
@@ -772,7 +759,6 @@ namespace CinemaModule.Services
 
         public void Dispose()
         {
-            _imageCache?.Dispose();
             _httpClient?.Dispose();
         }
 

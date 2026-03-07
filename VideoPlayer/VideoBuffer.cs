@@ -143,10 +143,8 @@ namespace CinemaModule.VideoPlayer
             }
             catch (ObjectDisposedException)
             {
-                // Texture was disposed between check and SetData
             }
         }
-
 
         public void Dispose()
         {

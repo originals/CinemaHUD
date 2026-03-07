@@ -3,6 +3,18 @@
 All notable changes to CinemaHUD will be documented in this file.
 
 
+## [2.0.0]
+
+### Added
+- WatchParty Feature for synchronized viewing 
+- YouTube video playback support
+- GW2 identity integration for WatchParty
+
+### Improved
+- Enhanced source tab organization
+- Stream editor dialog
+
+
 ## [1.3.0]
 
 ### Added

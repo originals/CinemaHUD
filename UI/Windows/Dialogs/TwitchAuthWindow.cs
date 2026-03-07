@@ -1,11 +1,11 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
-using CinemaModule.Services;
+using CinemaModule.Services.Twitch;
 using Microsoft.Xna.Framework;
 using System;
 
-namespace CinemaHUD.UI.Windows.SettingsSmall
+namespace CinemaModule.UI.Windows.Dialogs
 {
     public class TwitchAuthWindow : SmallWindow
     {

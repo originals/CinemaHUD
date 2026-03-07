@@ -1,6 +1,6 @@
 {
   "name": "CinemaHUD",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "namespace": "Originals.GW2.CinnemaHUD",
   "package": "CinemaHUD.dll",
   "manifest_version": 1,
@@ -18,6 +18,10 @@
     }
   ],
   "directories": [ "libvlc" ],
-  "enabled_without_gw2": false
+  "enabled_without_gw2": false,
+
+    "api_permissions": {
+        "account": { "optional": true, "details": "Required for Watch Party feature to identify your account." }
+    }
 
 }

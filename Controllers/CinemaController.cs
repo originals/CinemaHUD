@@ -3,16 +3,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using Blish_HUD;
 using Blish_HUD.Settings;
-using CinemaModule.Controllers;
+using CinemaModule.Controllers.WatchParty;
 using CinemaModule.Models;
+using CinemaModule.Models.Location;
+using CinemaModule.Models.Twitch;
 using CinemaModule.VideoPlayer;
 using VideoPlayerClass = CinemaModule.VideoPlayer.VideoPlayer;
 using CinemaModule.Services;
+using CinemaModule.Services.Twitch;
+using CinemaModule.Services.YouTube;
 using CinemaModule.Settings;
 using CinemaModule.UI.VideoDisplays;
-using Microsoft.Xna.Framework.Graphics;
 
-namespace CinemaModule
+namespace CinemaModule.Controllers
 {
     public class CinemaController : IDisposable
     {
@@ -24,13 +27,15 @@ namespace CinemaModule
         private readonly CinemaSettings _moduleSettings;
         private readonly CinemaUserSettings _userSettings;
         private readonly TwitchService _twitchService;
+        private readonly YouTubeService _youtubeService;
         private readonly RadioMetadataService _radioMetadataService;
 
         private readonly PlaybackController _playbackController;
-        private readonly DisplayManager _displayManager;
+        private readonly DisplayController _displayController;
         private readonly TwitchIntegrationHandler _twitchHandler;
 
-        private TwitchStreamInfo _currentTwitchStreamInfo;
+        private WatchPartyController _watchPartyController;
+        private WatchPartyPlaybackHandler _watchPartyPlaybackHandler;
         private bool _isDisposed;
 
         #endregion
@@ -44,16 +49,17 @@ namespace CinemaModule
 
         #endregion
 
-        public CinemaController(CinemaSettings coreSettings, CinemaUserSettings userSettings, TwitchService twitchService)
+        public CinemaController(CinemaSettings coreSettings, CinemaUserSettings userSettings, TwitchService twitchService, YouTubeService youtubeService)
         {
             _moduleSettings = coreSettings;
             _userSettings = userSettings;
             _twitchService = twitchService;
+            _youtubeService = youtubeService;
             _radioMetadataService = new RadioMetadataService();
 
-            _playbackController = new PlaybackController(coreSettings, userSettings, twitchService);
-            _displayManager = new DisplayManager(coreSettings, userSettings);
-            _twitchHandler = new TwitchIntegrationHandler(userSettings, twitchService);
+            _playbackController = new PlaybackController(coreSettings, userSettings, twitchService, youtubeService);
+            _displayController = new DisplayController(coreSettings, userSettings);
+            _twitchHandler = new TwitchIntegrationHandler(userSettings, twitchService, youtubeService);
 
             _radioMetadataService.TrackInfoUpdated += OnRadioTrackInfoUpdated;
 
@@ -66,8 +72,22 @@ namespace CinemaModule
         public void RegisterPlayer(VideoPlayerClass player)
         {
             _playbackController.RegisterPlayer(player);
-            _displayManager.RegisterPlayer(player);
+            _displayController.RegisterPlayer(player);
             _twitchHandler.RegisterPlayer(player);
+        }
+
+        public void RegisterWatchParty(WatchPartyController watchPartyController)
+        {
+            _watchPartyController = watchPartyController;
+            _watchPartyPlaybackHandler = new WatchPartyPlaybackHandler(
+                watchPartyController,
+                _playbackController,
+                _displayController,
+                _youtubeService,
+                _userSettings);
+
+            _twitchHandler.SetWatchPartyCheck(() => _watchPartyController?.IsInRoom == true);
+            _twitchHandler.QualityChangeCompleted += OnQualityChangeCompleted;
         }
 
         public void StartInitialPlaybackIfEnabled()
@@ -77,9 +97,9 @@ namespace CinemaModule
 
         public void RegisterDisplays(WindowVideoDisplay windowDisplay, WorldVideoDisplay worldDisplay)
         {
-            _displayManager.RegisterDisplays(windowDisplay, worldDisplay);
-            _displayManager.UpdateTwitchStreamState(IsTwitchStream);
-            _displayManager.UpdateDisplayVisibility();
+            _displayController.RegisterDisplays(windowDisplay, worldDisplay);
+            _displayController.UpdateTwitchStreamState(IsTwitchStream);
+            _displayController.UpdateDisplayVisibility();
             _twitchHandler.InitializeStreamInfo();
             UpdateRadioMetadataPolling();
         }
@@ -90,8 +110,9 @@ namespace CinemaModule
                 return;
 
             _playbackController.Update();
-            _displayManager.SyncDisplayState();
-            _displayManager.UpdateActiveDisplayTexture();
+            _watchPartyPlaybackHandler?.Update();
+            _displayController.SyncDisplayState();
+            _displayController.UpdateActiveDisplayTexture();
             UpdateSeekState();
         }
 
@@ -99,8 +120,8 @@ namespace CinemaModule
         {
             bool isSeekable = !IsTwitchStream && _playbackController.IsSeekable;
 
-            _displayManager.UpdateSeekableState(isSeekable, _playbackController.Duration);
-            _displayManager.UpdateCurrentPosition(_playbackController.Position);
+            _displayController.UpdateSeekableState(isSeekable, _playbackController.Duration);
+            _displayController.UpdateCurrentPosition(_playbackController.Position);
         }
 
         private bool IsTwitchStream => _userSettings.CurrentStreamSourceType == StreamSourceType.TwitchChannel;
@@ -148,6 +169,13 @@ namespace CinemaModule
             }
         }
 
+        public void PrepareForStreamChange()
+        {
+            _playbackController.Stop();
+            _displayController.UpdateOfflineState(true);
+            _ = LoadOfflineTextureAsync();
+        }
+
         public void RequestShowChat(string channelName)
         {
             if (string.IsNullOrEmpty(channelName))
@@ -159,23 +187,38 @@ namespace CinemaModule
             ShowChatRequested?.Invoke(this, channelName);
         }
 
+        public void ForceWatchPartyResync()
+        {
+            _watchPartyPlaybackHandler?.ForceResync();
+        }
+
+        public void ApplyLocation(SavedLocation location)
+        {
+            if (location?.Position == null)
+                return;
+
+            _userSettings.WorldPosition = location.Position;
+            _userSettings.WorldScreenWidth = location.ScreenWidth > 0 ? location.ScreenWidth : DefaultWorldScreenWidth;
+            Logger.Info($"Applied shared location: {location.Name}");
+        }
+
         #endregion
 
         #region Private Methods
 
         private void SubscribeToHandlerEvents()
         {
-            _displayManager.WindowPositionChanged += (s, pos) => _userSettings.WindowPosition = pos;
-            _displayManager.WindowSizeChanged += (s, size) => _userSettings.WindowSize = size;
-            _displayManager.WindowLockToggled += (s, locked) => _userSettings.WindowLocked = locked;
-            _displayManager.WorldDisplayInRangeChanged += OnWorldDisplayInRangeChanged;
-            _displayManager.PlayPauseClicked += (s, e) => _playbackController.TogglePause();
-            _displayManager.VolumeChangedFromUI += OnVolumeChangedFromUI;
-            _displayManager.SettingsClicked += (s, e) => ShowSettingsRequested?.Invoke(this, EventArgs.Empty);
-            _displayManager.QualityChanged += (s, index) => _twitchHandler.HandleQualityChange(index);
-            _displayManager.TwitchChatClicked += OnTwitchChatClicked;
-            _displayManager.CloseClicked += (s, e) => _moduleSettings.EnabledSetting.Value = false;
-            _displayManager.SeekRequested += OnSeekRequested;
+            _displayController.WindowPositionChanged += (s, pos) => _userSettings.WindowPosition = pos;
+            _displayController.WindowSizeChanged += (s, size) => _userSettings.WindowSize = size;
+            _displayController.WindowLockToggled += (s, locked) => _userSettings.WindowLocked = locked;
+            _displayController.WorldDisplayInRangeChanged += OnWorldDisplayInRangeChanged;
+            _displayController.PlayPauseClicked += (s, e) => _playbackController.TogglePause();
+            _displayController.VolumeChangedFromUI += OnVolumeChangedFromUI;
+            _displayController.SettingsClicked += (s, e) => ShowSettingsRequested?.Invoke(this, EventArgs.Empty);
+            _displayController.QualityChanged += (s, index) => _twitchHandler.HandleQualityChange(index);
+            _displayController.TwitchChatClicked += OnTwitchChatClicked;
+            _displayController.CloseClicked += (s, e) => _moduleSettings.EnabledSetting.Value = false;
+            _displayController.SeekRequested += OnSeekRequested;
 
             _twitchHandler.ChatChannelChangeRequested += (s, channel) => ChatChannelChangeRequested?.Invoke(this, channel);
             _twitchHandler.QualitiesUpdated += OnQualitiesUpdated;
@@ -215,22 +258,33 @@ namespace CinemaModule
 
             if (e.NewValue)
             {
-                _displayManager.UpdateDisplayVisibility();
+                _displayController.UpdateDisplayVisibility();
                 UpdateRadioMetadataPolling();
             }
             else
             {
-                _displayManager.HideAllDisplays();
+                _displayController.HideAllDisplays();
                 _radioMetadataService.StopPolling();
             }
         }
 
         private void OnStreamUrlChanged(object sender, string url)
         {
-            _displayManager.UpdateOfflineState(false);
-            _displayManager.UpdateOfflineTexture(null);
-            _currentTwitchStreamInfo = null;
-            _playbackController.HandleStreamUrlChanged(url);
+            CinemaModule.Instance.TextureService.ClearCachedStreamInfo();
+
+            if (string.IsNullOrEmpty(url))
+            {
+                _playbackController.HandleStreamUrlChanged(url);
+                _displayController.UpdateOfflineState(true);
+                _ = LoadOfflineTextureAsync();
+            }
+            else
+            {
+                _displayController.UpdateOfflineState(false);
+                _displayController.UpdateOfflineTexture(null);
+                _playbackController.HandleStreamUrlChanged(url);
+            }
+
             _twitchHandler.HandleStreamUrlChanged(IsTwitchStream);
             UpdateRadioMetadataPolling();
         }
@@ -238,19 +292,19 @@ namespace CinemaModule
         private void OnDisplayModeChanged(object sender, CinemaDisplayMode mode)
         {
             UpdateRangeBasedPlayback();
-            _displayManager.UpdateDisplayVisibility();
+            _displayController.UpdateDisplayVisibility();
             _playbackController.RestartPlaybackIfNeeded();
         }
 
         private void OnWorldPositionChanged(object sender, WorldPosition3D position)
         {
-            _displayManager.UpdateWorldPosition(position);
+            _displayController.UpdateWorldPosition(position);
             UpdateRangeBasedPlayback();
         }
 
         private void OnWorldScreenWidthChanged(object sender, float width)
         {
-            _displayManager.UpdateWorldScreenWidth(width);
+            _displayController.UpdateWorldScreenWidth(width);
         }
 
         private void OnVolumeChanged(object sender, int volume)
@@ -260,7 +314,7 @@ namespace CinemaModule
 
         private void OnCurrentStreamSourceTypeChanged(object sender, StreamSourceType sourceType)
         {
-            _displayManager.UpdateTwitchStreamState(IsTwitchStream);
+            _displayController.UpdateTwitchStreamState(IsTwitchStream);
             _twitchHandler.HandleStreamSourceTypeChanged(sourceType);
             UpdateRadioMetadataPolling();
         }
@@ -300,79 +354,40 @@ namespace CinemaModule
 
         private void OnQualitiesUpdated(object sender, TwitchQualitiesEventArgs e)
         {
-            _displayManager.UpdateAvailableQualities(e.QualityNames.ToList(), e.SelectedIndex);
+            _displayController.UpdateAvailableQualities(e.QualityNames.ToList(), e.SelectedIndex);
         }
 
         private void OnStreamInfoUpdated(object sender, TwitchStreamInfo streamInfo)
         {
-            _currentTwitchStreamInfo = streamInfo;
+            CinemaModule.Instance.TextureService.UpdateCachedStreamInfo(streamInfo);
+
             if (streamInfo != null)
-            {
-                _displayManager.UpdateStreamInfo(streamInfo.ChannelName, streamInfo.ViewerCount, streamInfo.GameName);
-            }
+                _displayController.UpdateStreamInfo(streamInfo.ChannelName, streamInfo.ViewerCount, streamInfo.GameName);
             else
-            {
-                _displayManager.UpdateStreamInfo(null, null, null);
-            }
+                _displayController.UpdateStreamInfo(null, null, null);
         }
 
         private void OnPlaybackStateChanged(object sender, PlaybackState state)
         {
             bool isOffline = state == PlaybackState.Stopped || state == PlaybackState.Error || state == PlaybackState.Ended;
-            _displayManager.UpdateOfflineState(isOffline);
+            _displayController.UpdateOfflineState(isOffline);
 
             if (isOffline)
-            {
                 _ = LoadOfflineTextureAsync();
-            }
             else if (state == PlaybackState.Playing)
-            {
-                _displayManager.UpdateOfflineTexture(null);
-            }
+                _displayController.UpdateOfflineTexture(null);
         }
 
         private async Task LoadOfflineTextureAsync()
         {
-            Texture2D offlineTexture = IsTwitchStream
-                ? await LoadTwitchAvatarTextureAsync()
-                : await LoadUrlStaticImageTextureAsync();
-
+            var offlineTexture = await CinemaModule.Instance.TextureService.LoadOfflineTextureAsync(_userSettings, _twitchService);
             if (offlineTexture != null)
-            {
-                _displayManager.UpdateOfflineTexture(offlineTexture);
-            }
+                _displayController.UpdateOfflineTexture(offlineTexture);
         }
 
-        private async Task<Texture2D> LoadTwitchAvatarTextureAsync()
+        private void OnQualityChangeCompleted(object sender, EventArgs e)
         {
-            var channelName = _userSettings.CurrentTwitchChannel;
-            if (string.IsNullOrEmpty(channelName))
-                return null;
-
-            var streamInfo = _currentTwitchStreamInfo ?? await _twitchService.GetStreamInfoAsync(channelName);
-            if (streamInfo == null || string.IsNullOrEmpty(streamInfo.AvatarUrl))
-                return null;
-
-            var avatarTexture = await _twitchService.GetAvatarTextureAsync($"offline_{channelName}", streamInfo.AvatarUrl);
-            return avatarTexture?.Texture;
-        }
-
-        private async Task<Texture2D> LoadUrlStaticImageTextureAsync()
-        {
-            var preset = _userSettings.CurrentStreamPreset;
-            if (preset == null)
-                return null;
-
-            if (string.IsNullOrEmpty(preset.StaticImage))
-                return null;
-
-            var textureService = CinemaModule.Instance.TextureService;
-            var asyncTexture = await textureService.GetImageFromUrlAsync($"offline_static_{preset.Id}", preset.StaticImage);
-
-            if (asyncTexture != null)
-                preset.StaticImageTexture = asyncTexture;
-
-            return asyncTexture?.Texture;
+            _watchPartyPlaybackHandler?.HandleQualityChanged();
         }
 
         private void OnSeekRequested(object sender, float position)
@@ -389,32 +404,29 @@ namespace CinemaModule
         private void UpdateRangeBasedPlayback()
         {
             _playbackController.UpdateRangeBasedPlayback(
-                _displayManager.IsWorldDisplayInRange,
+                _displayController.IsWorldDisplayInRange,
                 _userSettings.DisplayMode);
         }
 
         private void OnRadioTrackInfoUpdated(object sender, RadioTrackInfo trackInfo)
         {
             string trackName = trackInfo?.TrackName;
-            _displayManager.UpdateRadioTrackInfo(trackName);
+            _displayController.UpdateRadioTrackInfo(trackName);
         }
 
         private void UpdateRadioMetadataPolling()
         {
             var preset = _userSettings.CurrentStreamPreset;
-            bool isRadio = preset?.IsRadio == true;
-            bool showMetadata = preset?.AsylumInfo == true;
+            bool shouldPoll = preset?.IsRadio == true && preset?.AsylumInfo == true && !IsTwitchStream;
 
-            if (!isRadio || IsTwitchStream || !showMetadata)
+            if (!shouldPoll)
             {
                 _radioMetadataService.StopPolling();
-                _displayManager.UpdateRadioTrackInfo(null);
+                _displayController.UpdateRadioTrackInfo(null);
                 return;
             }
 
-            string streamUrl = _userSettings.StreamUrl;
-            string infoUrl = preset?.InfoUrl;
-            _radioMetadataService.StartPolling(streamUrl, infoUrl);
+            _radioMetadataService.StartPolling(_userSettings.StreamUrl, preset.InfoUrl);
         }
 
         #endregion
@@ -429,10 +441,11 @@ namespace CinemaModule
             UnsubscribeFromSettingsEvents();
 
             _radioMetadataService.TrackInfoUpdated -= OnRadioTrackInfoUpdated;
-            _radioMetadataService?.Dispose();
+            _radioMetadataService.Dispose();
             _playbackController?.Dispose();
-            _displayManager?.Dispose();
+            _displayController?.Dispose();
             _twitchHandler?.Dispose();
+            _watchPartyPlaybackHandler?.Dispose();
 
             _isDisposed = true;
         }

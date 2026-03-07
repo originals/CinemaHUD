@@ -53,6 +53,13 @@ namespace CinemaModule.UI.Controls
 
         public bool IsPaused { get; set; }
 
+        private bool _isWatchPartyViewer;
+        public bool IsWatchPartyViewer
+        {
+            get => _isWatchPartyViewer;
+            set => _isWatchPartyViewer = value;
+        }
+
         private int _volume = 100;
         public int Volume
         {
@@ -174,10 +181,15 @@ namespace CinemaModule.UI.Controls
 
         private void OnSeekBarValueChanged(object sender, ValueEventArgs<float> e)
         {
-            if (SeekBar.Dragging)
+            if (!SeekBar.Dragging) return;
+
+            if (_isWatchPartyViewer)
             {
-                _currentPosition = e.Value / 100f;
+                SeekBar.Value = _currentPosition * 100f;
+                return;
             }
+
+            _currentPosition = e.Value / 100f;
         }
 
         public void UpdateSeekBarDragState()
@@ -248,8 +260,12 @@ namespace CinemaModule.UI.Controls
             RaiseVolumeChanged(_volume);
         }
 
+        private bool _suppressQualityEvent;
+
         private void OnQualityDropdownChanged(object sender, ValueChangedEventArgs e)
         {
+            if (_suppressQualityEvent) return;
+
             int selectedIndex = QualityDropdown.Items.IndexOf(QualityDropdown.SelectedItem);
             if (selectedIndex >= 0)
             {
@@ -259,11 +275,15 @@ namespace CinemaModule.UI.Controls
 
         public void UpdateAvailableQualities(IReadOnlyList<string> qualityNames, int selectedIndex)
         {
+            Logger.GetLogger<BaseVideoControls>().Debug($"UpdateAvailableQualities: {qualityNames?.Count ?? 0} qualities, selectedIndex={selectedIndex}");
+            _suppressQualityEvent = true;
+
             QualityDropdown.Items.Clear();
 
             if (qualityNames == null || qualityNames.Count == 0)
             {
                 QualityDropdown.Visible = false;
+                _suppressQualityEvent = false;
                 return;
             }
 
@@ -276,6 +296,8 @@ namespace CinemaModule.UI.Controls
             {
                 QualityDropdown.SelectedItem = QualityDropdown.Items[selectedIndex];
             }
+
+            _suppressQualityEvent = false;
         }
 
         protected void StartFadeIn()

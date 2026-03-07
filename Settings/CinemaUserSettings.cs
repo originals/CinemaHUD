@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Blish_HUD;
 using CinemaModule.Models;
+using CinemaModule.Models.Location;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 
@@ -32,6 +33,7 @@ namespace CinemaModule.Settings
         public event EventHandler<int> VolumeChanged;
         public event EventHandler<StreamSourceType> CurrentStreamSourceTypeChanged;
         public event EventHandler<StreamPresetData> CurrentStreamPresetChanged;
+        public event EventHandler<string> CurrentYouTubeVideoChanged;
         public event EventHandler SavedLocationsChanged;
         public event EventHandler SavedStreamsChanged;
 
@@ -71,6 +73,19 @@ namespace CinemaModule.Settings
                 if (_data.CurrentTwitchChannel == normalizedValue) return;
                 _data.CurrentTwitchChannel = normalizedValue;
                 Save();
+            }
+        }
+
+        public string CurrentYouTubeVideo
+        {
+            get => _data.CurrentYouTubeVideo;
+            set
+            {
+                var normalizedValue = value ?? "";
+                if (_data.CurrentYouTubeVideo == normalizedValue) return;
+                _data.CurrentYouTubeVideo = normalizedValue;
+                Save();
+                CurrentYouTubeVideoChanged?.Invoke(this, normalizedValue);
             }
         }
 
@@ -219,6 +234,18 @@ namespace CinemaModule.Settings
             set => SetProperty(_data.TwitchChatWindowChannel, value ?? "", v => _data.TwitchChatWindowChannel = v);
         }
 
+        public bool AutoplayOnStartup
+        {
+            get => _data.AutoplayOnStartup;
+            set => SetProperty(_data.AutoplayOnStartup, value, v => _data.AutoplayOnStartup = v);
+        }
+
+        public bool WatchPartyAutoplayNext
+        {
+            get => _data.WatchPartyAutoplayNext;
+            set => SetProperty(_data.WatchPartyAutoplayNext, value, v => _data.WatchPartyAutoplayNext = v);
+        }
+
         #endregion
 
         public CinemaUserSettings(string settingsDirectory)
@@ -261,9 +288,9 @@ namespace CinemaModule.Settings
             return true;
         }
 
-        public SavedStream AddSavedStream(string name, StreamSourceType sourceType, string value)
+        public SavedStream AddSavedStream(string name, StreamSourceType sourceType, string value, string tabId = null)
         {
-            var stream = new SavedStream(name, sourceType, value);
+            var stream = new SavedStream(name, sourceType, value, tabId);
             SavedStreams.Streams.Add(stream);
             Save();
             RaiseEvent(SavedStreamsChanged);
@@ -294,11 +321,73 @@ namespace CinemaModule.Settings
             return removed;
         }
 
+        public CustomStreamTab AddCustomTab(string name)
+        {
+            string truncatedName = name?.Length > 16 ? name.Substring(0, 16) : name;
+            var tab = new CustomStreamTab(truncatedName);
+            SavedStreams.Tabs.Add(tab);
+            Save();
+            RaiseEvent(SavedStreamsChanged);
+            return tab;
+        }
+
+        public void RenameCustomTab(string tabId, string newName)
+        {
+            var tab = SavedStreams.Tabs.Find(t => t.Id == tabId);
+            if (tab != null)
+            {
+                tab.Name = newName?.Length > 16 ? newName.Substring(0, 16) : newName;
+                Save();
+                RaiseEvent(SavedStreamsChanged);
+            }
+        }
+
+        public bool DeleteCustomTab(string tabId)
+        {
+            if (SavedStreams.Tabs.Count <= 1)
+                return false;
+
+            var removed = SavedStreams.Tabs.RemoveAll(t => t.Id == tabId) > 0;
+            if (removed)
+            {
+                SavedStreams.Streams.RemoveAll(s => s.TabId == tabId);
+                Save();
+                RaiseEvent(SavedStreamsChanged);
+            }
+            return removed;
+        }
+
+        public void EnsureDefaultTab()
+        {
+            if (SavedStreams.Tabs.Count == 0)
+            {
+                var defaultTab = new CustomStreamTab("My Streams");
+                SavedStreams.Tabs.Add(defaultTab);
+
+                foreach (var stream in SavedStreams.Streams)
+                {
+                    if (string.IsNullOrEmpty(stream.TabId))
+                        stream.TabId = defaultTab.Id;
+                }
+                Save();
+            }
+        }
+
         public void SelectTwitchChannel(string channelName)
         {
             SelectedSavedStreamId = "";
             CurrentTwitchChannel = channelName;
+            CurrentYouTubeVideo = "";
             CurrentStreamSourceType = StreamSourceType.TwitchChannel;
+            CurrentStreamPreset = null;
+        }
+
+        public void SelectYouTubeVideo(string videoIdOrUrl)
+        {
+            SelectedSavedStreamId = "";
+            CurrentTwitchChannel = "";
+            CurrentYouTubeVideo = videoIdOrUrl;
+            CurrentStreamSourceType = StreamSourceType.YouTubeVideo;
             CurrentStreamPreset = null;
         }
 
@@ -315,11 +404,23 @@ namespace CinemaModule.Settings
         public void SelectSavedStream(SavedStream stream)
         {
             SelectedSavedStreamId = stream.Id;
-            CurrentStreamSourceType = stream.SourceType;
             CurrentTwitchChannel = stream.SourceType == StreamSourceType.TwitchChannel ? stream.Value : "";
+            CurrentYouTubeVideo = stream.SourceType == StreamSourceType.YouTubeVideo ? stream.Value : "";
+            CurrentStreamSourceType = stream.SourceType;
             if (stream.SourceType == StreamSourceType.Url)
                 StreamUrl = stream.Value;
             CurrentStreamPreset = null;
+        }
+
+        public void ClearStreamSelection()
+        {
+            _data.SelectedSavedStreamId = "";
+            _data.SelectedUrlChannelId = "";
+            _data.CurrentTwitchChannel = "";
+            _data.CurrentYouTubeVideo = "";
+            _data.StreamUrl = "";
+            _data.CurrentStreamSourceType = StreamSourceType.Url;
+            _currentStreamPreset = null;
         }
 
         #endregion
@@ -376,12 +477,13 @@ namespace CinemaModule.Settings
                     string json = File.ReadAllText(_settingsFilePath);
                     _data = JsonConvert.DeserializeObject<CinemaUserSettingsData>(json) 
                         ?? new CinemaUserSettingsData();
-                    
+
                     if (_data.SavedLocations == null) _data.SavedLocations = new SavedLocationCollection();
                     if (_data.SavedStreams == null) _data.SavedStreams = new SavedStreamCollection();
                     if (_data.WorldPosition == null) _data.WorldPosition = new WorldPosition3D(0, 0, 0, 0);
-                                        
+
                     MigrateTwitchChannelFromSelectedStream();
+                    EnsureDefaultTab();
                 }
                 catch (Exception ex)
                 {
@@ -392,6 +494,7 @@ namespace CinemaModule.Settings
             else
             {
                 _data = new CinemaUserSettingsData();
+                EnsureDefaultTab();
             }
         }
 
@@ -417,12 +520,12 @@ namespace CinemaModule.Settings
         #endregion
     }
 
-
     /// Data model for JSON serialization of CinemaHUD settings.
     internal class CinemaUserSettingsData
     {
         public string StreamUrl { get; set; } = "";
         public string CurrentTwitchChannel { get; set; } = "";
+        public string CurrentYouTubeVideo { get; set; } = "";
         public StreamSourceType CurrentStreamSourceType { get; set; } = StreamSourceType.Url;
         public int Volume { get; set; } = 50;
         public CinemaDisplayMode DisplayMode { get; set; } = CinemaDisplayMode.OnScreen;
@@ -447,5 +550,7 @@ namespace CinemaModule.Settings
         public bool TwitchChatWindowOpen { get; set; }
         public Point TwitchChatWindowSize { get; set; } = new Point(439, 514);
         public string TwitchChatWindowChannel { get; set; } = "";
+        public bool AutoplayOnStartup { get; set; }
+        public bool WatchPartyAutoplayNext { get; set; }
     }
 }

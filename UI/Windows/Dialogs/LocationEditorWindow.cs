@@ -1,14 +1,14 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
-using CinemaModule;
-using CinemaModule.Models;
+using CinemaModule.Controllers;
+using CinemaModule.Models.Location;
 using CinemaModule.Services;
 using CinemaModule.Settings;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using System;
 
-namespace CinemaHUD.UI.Windows.SettingsSmall
+namespace CinemaModule.UI.Windows.Dialogs
 {
     public class LocationEditorWindow : SmallWindow
     {

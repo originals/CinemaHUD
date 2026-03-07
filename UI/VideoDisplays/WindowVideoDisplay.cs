@@ -83,6 +83,12 @@ namespace CinemaModule.UI.VideoDisplays
             set => _controlsOverlay.IsSeekable = value;
         }
 
+        public bool IsWatchPartyViewer
+        {
+            get => _controlsOverlay.IsWatchPartyViewer;
+            set => _controlsOverlay.IsWatchPartyViewer = value;
+        }
+
         public float CurrentPosition
         {
             get => _controlsOverlay.CurrentPosition;

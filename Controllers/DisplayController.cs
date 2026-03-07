@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Blish_HUD;
 using CinemaModule.Models;
+using CinemaModule.Models.Location;
 using CinemaModule.VideoPlayer;
 using VideoPlayerClass = CinemaModule.VideoPlayer.VideoPlayer;
 using CinemaModule.Settings;
@@ -11,10 +11,8 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace CinemaModule.Controllers
 {
-    public class DisplayManager : IDisposable
+    public class DisplayController : IDisposable
     {
-        private static readonly Logger Logger = Logger.GetLogger<DisplayManager>();
-
         private readonly CinemaSettings _moduleSettings;
         private readonly CinemaUserSettings _userSettings;
 
@@ -38,7 +36,7 @@ namespace CinemaModule.Controllers
 
         public bool IsWorldDisplayInRange => _worldDisplay?.IsInRange ?? false;
 
-        public DisplayManager(CinemaSettings moduleSettings, CinemaUserSettings userSettings)
+        public DisplayController(CinemaSettings moduleSettings, CinemaUserSettings userSettings)
         {
             _moduleSettings = moduleSettings;
             _userSettings = userSettings;
@@ -112,14 +110,10 @@ namespace CinemaModule.Controllers
             bool isEnabled = _moduleSettings.IsEnabled;
 
             if (_windowDisplay != null)
-            {
                 _windowDisplay.Visible = isEnabled && isOnScreen;
-            }
 
             if (_worldDisplay != null)
-            {
                 _worldDisplay.Visible = isEnabled && !isOnScreen;
-            }
         }
 
         public void HideAllDisplays()
@@ -217,60 +211,27 @@ namespace CinemaModule.Controllers
                 : _worldDisplay;
         }
 
-        private void OnWindowPositionChanged(object sender, Point position)
-        {
-            WindowPositionChanged?.Invoke(this, position);
-        }
+        private void OnWindowPositionChanged(object sender, Point position) => WindowPositionChanged?.Invoke(this, position);
 
-        private void OnWindowSizeChanged(object sender, Point size)
-        {
-            WindowSizeChanged?.Invoke(this, size);
-        }
+        private void OnWindowSizeChanged(object sender, Point size) => WindowSizeChanged?.Invoke(this, size);
 
-        private void OnWindowLockToggled(object sender, bool isLocked)
-        {
-            WindowLockToggled?.Invoke(this, isLocked);
-        }
+        private void OnWindowLockToggled(object sender, bool isLocked) => WindowLockToggled?.Invoke(this, isLocked);
 
-        private void OnWorldDisplayInRangeChanged(object sender, bool isInRange)
-        {
-            WorldDisplayInRangeChanged?.Invoke(this, isInRange);
-        }
+        private void OnWorldDisplayInRangeChanged(object sender, bool isInRange) => WorldDisplayInRangeChanged?.Invoke(this, isInRange);
 
-        private void OnPlayPauseClicked(object sender, EventArgs e)
-        {
-            PlayPauseClicked?.Invoke(this, e);
-        }
+        private void OnPlayPauseClicked(object sender, EventArgs e) => PlayPauseClicked?.Invoke(this, e);
 
-        private void OnVolumeChangedFromUI(object sender, int volume)
-        {
-            VolumeChangedFromUI?.Invoke(this, volume);
-        }
+        private void OnVolumeChangedFromUI(object sender, int volume) => VolumeChangedFromUI?.Invoke(this, volume);
 
-        private void OnDisplaySettingsClicked(object sender, EventArgs e)
-        {
-            SettingsClicked?.Invoke(this, e);
-        }
+        private void OnDisplaySettingsClicked(object sender, EventArgs e) => SettingsClicked?.Invoke(this, e);
 
-        private void OnQualityChanged(object sender, int qualityIndex)
-        {
-            QualityChanged?.Invoke(this, qualityIndex);
-        }
+        private void OnQualityChanged(object sender, int qualityIndex) => QualityChanged?.Invoke(this, qualityIndex);
 
-        private void OnTwitchChatClicked(object sender, EventArgs e)
-        {
-            TwitchChatClicked?.Invoke(this, e);
-        }
+        private void OnTwitchChatClicked(object sender, EventArgs e) => TwitchChatClicked?.Invoke(this, e);
 
-        private void OnCloseClicked(object sender, EventArgs e)
-        {
-            CloseClicked?.Invoke(this, e);
-        }
+        private void OnCloseClicked(object sender, EventArgs e) => CloseClicked?.Invoke(this, e);
 
-        private void OnSeekRequested(object sender, float position)
-        {
-            SeekRequested?.Invoke(this, position);
-        }
+        private void OnSeekRequested(object sender, float position) => SeekRequested?.Invoke(this, position);
 
         private void ForEachDisplay(Action<IVideoDisplay> action)
         {
@@ -295,6 +256,11 @@ namespace CinemaModule.Controllers
             ForEachDisplay(d => d.CurrentPosition = position);
         }
 
+        public void UpdateWatchPartyViewerState(bool isViewer)
+        {
+            ForEachDisplay(d => d.IsWatchPartyViewer = isViewer);
+        }
+
         public void UpdateStreamInfo(string title, int? viewerCount, string gameName)
         {
             if (_windowDisplay == null)
@@ -308,6 +274,11 @@ namespace CinemaModule.Controllers
         public void UpdateRadioTrackInfo(string trackName)
         {
             ForEachDisplay(d => d.RadioTrackName = trackName);
+        }
+
+        public void ClearVideoTexture()
+        {
+            ForEachDisplay(d => d.UpdateTexture(null));
         }
 
         public void Dispose()

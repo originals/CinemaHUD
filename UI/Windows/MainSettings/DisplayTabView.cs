@@ -2,9 +2,11 @@ using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
 using Blish_HUD.Settings;
-using CinemaHUD.UI.Windows.Info;
-using CinemaModule;
+using CinemaModule.UI.Windows.Info;
+using CinemaModule.UI.Windows.Dialogs;
+using CinemaModule.Controllers;
 using CinemaModule.Models;
+using CinemaModule.Models.Location;
 using CinemaModule.Services;
 using CinemaModule.Settings;
 using Microsoft.Xna.Framework;
@@ -12,9 +14,8 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using LocationEditorWindow = CinemaHUD.UI.Windows.SettingsSmall.LocationEditorWindow;
 
-namespace CinemaHUD.UI.Windows.MainSettings
+namespace CinemaModule.UI.Windows.MainSettings
 {
     public class DisplayTabView : View
     {
@@ -253,7 +254,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _categoryLookup.Clear();
 
             var myLocationsItem = _categoryMenu.AddMenuItem(CategoryMyLocations);
-            myLocationsItem.Icon = CinemaModule.CinemaModule.Instance.TextureService.GetEmblem();
+            myLocationsItem.Icon = CinemaModule.Instance.TextureService.GetEmblem();
 
             foreach (var category in _presetService.WorldLocationCategories)
             {
@@ -400,7 +401,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             var importButton = new GlowButton
             {
-                Icon = CinemaModule.CinemaModule.Instance.TextureService.GetImportIcon(),
+                Icon = CinemaModule.Instance.TextureService.GetImportIcon(),
                 Size = new Point(30, 26),
                 BasicTooltipText = "Import from Clipboard",
                 Left = _contentContainer.Width - 145,
@@ -461,7 +462,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 {
                     Text = "",
                     Width = 30,
-                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetInfoIcon(),
+                    Icon = CinemaModule.Instance.TextureService.GetInfoIcon(),
                     Tooltip = "View Details",
                     OnClick = () => ShowPresetInfo(preset)
                 }
@@ -473,7 +474,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 {
                     Text = "",
                     Width = 30,
-                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetWaypointIcon(),
+                    Icon = CinemaModule.Instance.TextureService.GetWaypointIcon(),
                     Tooltip = "Copy Waypoint",
                     OnClick = () => CopyWaypointToClipboard(preset.Waypoint)
                 });
@@ -511,7 +512,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 {
                     Text = "",
                     Width = 30,
-                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetDeleteIcon(),
+                    Icon = CinemaModule.Instance.TextureService.GetDeleteIcon(),
                     Tooltip = "Delete",
                     OnClick = () => DeleteLocation(location)
                 },
@@ -519,7 +520,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 {
                     Text = "",
                     Width = 30,
-                    Icon = CinemaModule.CinemaModule.Instance.TextureService.GetExportIcon(),
+                    Icon = CinemaModule.Instance.TextureService.GetExportIcon(),
                     Tooltip = "Export to Clipboard",
                     OnClick = () => ExportLocationToClipboard(location)
                 },
@@ -540,7 +541,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             UpdateCardMapName(card, mapId);
 
-            var avatarTexture = CinemaModule.CinemaModule.Instance.TextureService.GetDefaultAvatar();
+            var avatarTexture = CinemaModule.Instance.TextureService.GetDefaultAvatar();
             if (avatarTexture != null)
                 card.SetAvatar(avatarTexture);
         }
@@ -688,7 +689,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
         {
             if (_presetInfoWindow == null)
             {
-                var bgTexture = CinemaModule.CinemaModule.Instance.TextureService.GetSmallWindowBackground();
+                var bgTexture = CinemaModule.Instance.TextureService.GetSmallWindowBackground();
                 _presetInfoWindow = new LocationInfoWindow(bgTexture);
             }
             return _presetInfoWindow;

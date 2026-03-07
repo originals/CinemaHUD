@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
 
-namespace CinemaHUD.UI.Windows.MainSettings
+namespace CinemaModule.UI.Windows.MainSettings
 {
     public class ListCardButton
     {
@@ -22,7 +22,6 @@ namespace CinemaHUD.UI.Windows.MainSettings
     public class ListCard : Panel
     {
         private static readonly Logger Logger = Logger.GetLogger<ListCard>();
-        private static readonly AsyncTexture2D _textureMenuItemFade = AsyncTexture2D.FromAssetId(156044);
 
         #region Fields
 
@@ -51,7 +50,9 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private readonly List<Control> _buttons = new List<Control>();
         private readonly object _buttonsLock = new object();
         private readonly ScrollingHighlightEffect _scrollEffect;
+        private readonly bool _showAvatar;
         private bool _isSelected;
+        private LoadingSpinner _loadingSpinner;
 
         #endregion
 
@@ -87,12 +88,14 @@ namespace CinemaHUD.UI.Windows.MainSettings
             int textPanelWidth = DefaultTextPanelWidth,
             IEnumerable<ListCardButton> buttons = null,
             AsyncTexture2D avatarTexture = null,
-            AsyncTexture2D iconTexture = null)
+            AsyncTexture2D iconTexture = null,
+            bool showAvatar = true)
         {
             WidthSizingMode = SizingMode.Fill;
             Height = DefaultCardHeight;
             Parent = parent;
             _isSelected = isSelected;
+            _showAvatar = showAvatar;
 
             _scrollEffect = new ScrollingHighlightEffect(this)
             {
@@ -101,16 +104,19 @@ namespace CinemaHUD.UI.Windows.MainSettings
             EffectBehind = _scrollEffect;
             UpdateSelectedState();
 
-            int textPanelLeft = ImageLeft + ImageDefaultWidth + 8;
+            int textPanelLeft = _showAvatar ? ImageLeft + ImageDefaultWidth + 8 : ImageLeft;
 
-            _avatarImage = new Image
+            if (_showAvatar)
             {
-                Size = new Point(ImageDefaultWidth, ImageMaxHeight),
-                Left = ImageLeft,
-                Top = ImageTop,
-                Texture = ContentService.Textures.TransparentPixel,
-                Parent = this
-            };
+                _avatarImage = new Image
+                {
+                    Size = new Point(ImageDefaultWidth, ImageMaxHeight),
+                    Left = ImageLeft,
+                    Top = ImageTop,
+                    Texture = ContentService.Textures.TransparentPixel,
+                    Parent = this
+                };
+            }
 
             _textPanel = new FlowPanel
             {
@@ -185,9 +191,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
         {
             base.PaintBeforeChildren(spriteBatch, bounds);
 
-            if (_textureMenuItemFade.HasTexture && ShouldDrawDarkStripe())
+            var menuItemFade = CinemaModule.Instance.TextureService?.GetMenuItemFade();
+            if (menuItemFade?.HasTexture == true && ShouldDrawDarkStripe())
             {
-                spriteBatch.DrawOnCtrl(this, _textureMenuItemFade, bounds, Color.Black * 0.4f);
+                spriteBatch.DrawOnCtrl(this, menuItemFade, bounds, Color.Black * 0.4f);
             }
         }
 
@@ -377,8 +384,16 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         public void SetAvatar(AsyncTexture2D texture)
         {
-            if (texture == null)
+            if (_avatarImage == null)
                 return;
+
+            if (texture == null)
+            {
+                _avatarImage.Texture = null;
+                _avatarImage.Size = new Point(ImageDefaultWidth, ImageMaxHeight);
+                _textPanel.Left = ImageLeft + ImageDefaultWidth + 8;
+                return;
+            }
 
             _avatarImage.Texture = texture;
 
@@ -407,9 +422,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void UpdateAvatarSize(int textureWidth, int textureHeight)
         {
-            if (textureWidth <= 0 || textureHeight <= 0)
+            if (_avatarImage == null || textureWidth <= 0 || textureHeight <= 0)
             {
-                Logger.Warn($"Invalid avatar dimensions: {textureWidth}x{textureHeight}");
+                if (textureWidth <= 0 || textureHeight <= 0)
+                    Logger.Warn($"Invalid avatar dimensions: {textureWidth}x{textureHeight}");
                 return;
             }
 
@@ -435,6 +451,33 @@ namespace CinemaHUD.UI.Windows.MainSettings
             else
             {
                 _textPanel.Top = (DefaultCardHeight - 20) / 2;
+            }
+        }
+
+        public void ShowLoading(bool show)
+        {
+            if (show)
+            {
+                if (_loadingSpinner == null)
+                {
+                    _loadingSpinner = new LoadingSpinner
+                    {
+                        Size = new Point(32, 32),
+                        Left = _textPanel.Left,
+                        Top = (DefaultCardHeight - 32) / 2,
+                        Parent = this
+                    };
+                }
+                _loadingSpinner.Visible = true;
+                _textPanel.Visible = false;
+            }
+            else
+            {
+                if (_loadingSpinner != null)
+                {
+                    _loadingSpinner.Visible = false;
+                }
+                _textPanel.Visible = true;
             }
         }
     }

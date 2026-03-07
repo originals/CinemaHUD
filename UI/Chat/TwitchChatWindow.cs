@@ -2,6 +2,7 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using CinemaModule.Services;
+using CinemaModule.Services.Twitch;
 using CinemaModule.Settings;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;

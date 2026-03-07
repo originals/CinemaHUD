@@ -1,5 +1,5 @@
 using Blish_HUD;
-using CinemaModule.Models;
+using CinemaModule.Models.Twitch;
 using Microsoft.Xna.Framework;
 using System;
 using System.IO;
@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CinemaModule.Services
+namespace CinemaModule.Services.Twitch
 {
     public class TwitchChatService : IDisposable
     {

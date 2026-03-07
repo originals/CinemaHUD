@@ -1,31 +1,39 @@
 using Blish_HUD;
 using Blish_HUD.Controls;
 using CinemaModule.Models;
+using CinemaModule.Services;
 using CinemaModule.Settings;
 using Microsoft.Xna.Framework;
 using System;
 
-namespace CinemaHUD.UI.Windows.SettingsSmall
+namespace CinemaModule.UI.Windows.Dialogs
 {
     public class StreamEditorWindow : SmallWindow
     {
         private const int TextBoxWidth = 350;
-        private const int DropdownWidth = 200;
         private const int ButtonWidth = 100;
-        private const string SourceTypeTwitch = "Twitch Channel";
-        private const string SourceTypeUrl = "URL";
+        private const int SourceButtonSize = 32;
         private const string UrlHelpText = "Supported formats:\n" +
             "• Video files: MP4, MKV, AVI, WEBM\n" +
             "• Live streams: M3U8, HLS, RTSP, RTMP\n" +
             "• Radio/Audio: MP3, AAC, OGG streams\n" +
             "• Local files: file:///C:/path/to/video.mp4";
+        private const string YouTubeHelpText = "Supported formats:\n" +
+            "• Full URL: https://www.youtube.com/watch?v=VIDEO_ID\n" +
+            "• Short URL: https://youtu.be/VIDEO_ID\n" +
+            "• Video ID: VIDEO_ID";
 
         private readonly CinemaUserSettings _settings;
+        private readonly TextureService _textureService;
         private SavedStream _stream;
         private bool _isNewStream;
+        private string _tabId;
+        private StreamSourceType _selectedSourceType;
 
         private TextBox _nameTextBox;
-        private Dropdown _sourceTypeDropdown;
+        private GlowButton _twitchButton;
+        private GlowButton _youtubeButton;
+        private GlowButton _urlButton;
         private TextBox _valueTextBox;
         private Label _valueLabel;
         private Label _helpLabel;
@@ -35,10 +43,11 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         public event EventHandler StreamSaved;
         public event EventHandler StreamDeleted;
 
-        public StreamEditorWindow(CinemaUserSettings settings)
-            : base("Add Stream")
+        public StreamEditorWindow(CinemaUserSettings settings, TextureService textureService)
+            : base("Add Source")
         {
             _settings = settings;
+            _textureService = textureService;
 
             Initialize();
         }
@@ -66,7 +75,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         {
             new Label
             {
-                Text = "Stream Name",
+                Text = "Name",
                 AutoSizeHeight = true,
                 AutoSizeWidth = true,
                 Font = GameService.Content.DefaultFont16,
@@ -76,7 +85,7 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             _nameTextBox = new TextBox
             {
                 Width = TextBoxWidth,
-                PlaceholderText = "Enter a name for this stream",
+                PlaceholderText = "Enter a name",
                 Parent = parent
             };
         }
@@ -92,15 +101,41 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
                 Parent = parent
             };
 
-            _sourceTypeDropdown = new Dropdown
+            var buttonPanel = new FlowPanel
             {
-                Width = DropdownWidth,
+                FlowDirection = ControlFlowDirection.SingleLeftToRight,
+                WidthSizingMode = SizingMode.AutoSize,
+                HeightSizingMode = SizingMode.AutoSize,
+                ControlPadding = new Vector2(8, 0),
                 Parent = parent
             };
-            _sourceTypeDropdown.Items.Add(SourceTypeUrl);
-            _sourceTypeDropdown.Items.Add(SourceTypeTwitch);
-            _sourceTypeDropdown.SelectedItem = SourceTypeTwitch;
-            _sourceTypeDropdown.ValueChanged += (s, e) => OnSourceTypeChanged();
+
+            _twitchButton = CreateSourceButton(buttonPanel, _textureService.GetTwitchIcon(), "Twitch", StreamSourceType.TwitchChannel);
+            _youtubeButton = CreateSourceButton(buttonPanel, _textureService.GetYoutubeIcon(), "YouTube", StreamSourceType.YouTubeVideo);
+            _urlButton = CreateSourceButton(buttonPanel, _textureService.GetVlcIcon(), "URL", StreamSourceType.Url);
+        }
+
+        private GlowButton CreateSourceButton(Container parent, Blish_HUD.Content.AsyncTexture2D icon, string tooltip, StreamSourceType sourceType)
+        {
+            var button = new GlowButton
+            {
+                Icon = icon,
+                ToggleGlow = true,
+                Size = new Point(SourceButtonSize, SourceButtonSize),
+                BasicTooltipText = tooltip,
+                Parent = parent
+            };
+            button.Click += (s, e) => SelectSourceType(sourceType);
+            return button;
+        }
+
+        private void SelectSourceType(StreamSourceType sourceType)
+        {
+            _selectedSourceType = sourceType;
+            _twitchButton.Checked = sourceType == StreamSourceType.TwitchChannel;
+            _youtubeButton.Checked = sourceType == StreamSourceType.YouTubeVideo;
+            _urlButton.Checked = sourceType == StreamSourceType.Url;
+            OnSourceTypeChanged();
         }
 
         private void BuildValueSection(Container parent)
@@ -170,23 +205,35 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
 
         private void OnSourceTypeChanged()
         {
-            bool isTwitch = _sourceTypeDropdown.SelectedItem == SourceTypeTwitch;
-
-            _valueLabel.Text = isTwitch ? "Channel Name" : "Stream URL";
-            _valueTextBox.PlaceholderText = isTwitch 
-                ? "Channel name (e.g., phandrel)"
-                : "Enter stream or video URL";
-            _helpLabel.Text = isTwitch ? "" : UrlHelpText;
+            switch (_selectedSourceType)
+            {
+                case StreamSourceType.TwitchChannel:
+                    _valueLabel.Text = "Channel Name";
+                    _valueTextBox.PlaceholderText = "Channel name (e.g., phandrel)";
+                    _helpLabel.Text = "";
+                    break;
+                case StreamSourceType.YouTubeVideo:
+                    _valueLabel.Text = "YouTube URL or Video ID";
+                    _valueTextBox.PlaceholderText = "YouTube URL or video ID";
+                    _helpLabel.Text = YouTubeHelpText;
+                    break;
+                default:
+                    _valueLabel.Text = "URL";
+                    _valueTextBox.PlaceholderText = "Enter URL";
+                    _helpLabel.Text = UrlHelpText;
+                    break;
+            }
         }
 
-        public void OpenForNew(StreamSourceType sourceType = StreamSourceType.TwitchChannel)
+        public void OpenForNew(string tabId = null, StreamSourceType sourceType = StreamSourceType.TwitchChannel)
         {
             _isNewStream = true;
             _stream = new SavedStream();
-            Title = "Add Stream";
+            _tabId = tabId;
+            Title = "Add Source";
 
             _nameTextBox.Text = "";
-            _sourceTypeDropdown.SelectedItem = GetDropdownValue(sourceType);
+            SelectSourceType(sourceType);
             _valueTextBox.Text = "";
             _saveButton.Visible = true;
             _deleteButton.Visible = false;
@@ -199,21 +246,17 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
         {
             _isNewStream = false;
             _stream = stream;
-            Title = "Edit Stream";
+            _tabId = stream.TabId;
+            Title = "Edit Source";
 
             _nameTextBox.Text = stream.Name ?? "";
-            _sourceTypeDropdown.SelectedItem = GetDropdownValue(stream.SourceType);
+            SelectSourceType(stream.SourceType);
             _valueTextBox.Text = stream.Value ?? "";
             _saveButton.Visible = true;
             _deleteButton.Visible = true;
 
             OnSourceTypeChanged();
             Show();
-        }
-
-        private string GetDropdownValue(StreamSourceType sourceType)
-        {
-            return sourceType == StreamSourceType.TwitchChannel ? SourceTypeTwitch : SourceTypeUrl;
         }
 
         private void Save()
@@ -224,13 +267,11 @@ namespace CinemaHUD.UI.Windows.SettingsSmall
             if (string.IsNullOrWhiteSpace(value)) return;
             if (string.IsNullOrWhiteSpace(name)) name = value;
 
-            var sourceType = _sourceTypeDropdown.SelectedItem == SourceTypeTwitch
-                ? StreamSourceType.TwitchChannel
-                : StreamSourceType.Url;
+            var sourceType = _selectedSourceType;
 
             if (_isNewStream)
             {
-                _settings.AddSavedStream(name, sourceType, value);
+                _settings.AddSavedStream(name, sourceType, value, _tabId);
             }
             else
             {

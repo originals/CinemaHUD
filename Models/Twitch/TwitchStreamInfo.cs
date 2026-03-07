@@ -1,4 +1,4 @@
-namespace CinemaModule.Models
+namespace CinemaModule.Models.Twitch
 {
     public class TwitchStreamInfo
     {

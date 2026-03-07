@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Input;
-using CinemaModule.Models;
+using CinemaModule.Models.Location;
 using CinemaModule.Services;
 using CinemaModule.UI.Controls;
 using CinemaModule.UI.VideoDisplays.Rendering;
@@ -105,6 +105,18 @@ namespace CinemaModule.UI.VideoDisplays
                 if (_controlPanel != null)
                 {
                     _controlPanel.IsSeekable = value;
+                }
+            }
+        }
+
+        public bool IsWatchPartyViewer
+        {
+            get => _controlPanel?.IsWatchPartyViewer ?? false;
+            set
+            {
+                if (_controlPanel != null)
+                {
+                    _controlPanel.IsWatchPartyViewer = value;
                 }
             }
         }

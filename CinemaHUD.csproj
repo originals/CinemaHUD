@@ -5,15 +5,24 @@
   <UseWindowsForms>true</UseWindowsForms>
 </PropertyGroup>
 
+<ItemGroup>
+  <Compile Remove="WatchPartyServer\**" />
+  <EmbeddedResource Remove="WatchPartyServer\**" />
+  <None Remove="WatchPartyServer\**" />
+</ItemGroup>
+
   <ItemGroup>
     <None Include=".github\copilot-instructions.md" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="BlishHUD" Version="1.3.0" ExcludeAssets="runtime;contentFiles;analyzers" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="5.0.17" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="5.0.17" />
     <PackageReference Include="System.ComponentModel.Composition" Version="6.0.0" />
     <PackageReference Include="LibVLCSharp" Version="3.9.5" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
+    <PackageReference Include="YoutubeExplode" Version="6.5.7" />
   </ItemGroup>
 
   <Target Name="RemoveX86LibVLC" AfterTargets="Build">

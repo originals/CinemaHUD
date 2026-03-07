@@ -14,6 +14,8 @@ namespace CinemaModule.UI.VideoDisplays
 
         bool IsSeekable { get; set; }
 
+        bool IsWatchPartyViewer { get; set; }
+
         float CurrentPosition { get; set; }
 
         long Duration { get; set; }

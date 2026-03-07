@@ -1,5 +1,10 @@
 using Blish_HUD;
 using Blish_HUD.Content;
+using CinemaModule.Models;
+using CinemaModule.Models.Twitch;
+using CinemaModule.Services.Twitch;
+using CinemaModule.Services.YouTube;
+using CinemaModule.Settings;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.IO;
@@ -8,15 +13,13 @@ using System.Threading.Tasks;
 
 namespace CinemaModule.Services
 {
-    /// <summary>
-    /// Access to bundled textures, GW2 asset textures, URL-based images with caching.
-    /// </summary>
     public class TextureService : IDisposable
     {
         private static readonly Logger Logger = Logger.GetLogger<TextureService>();
         private readonly ImageCacheService _imageCache;
         private readonly HttpClient _httpClient;
         private Texture2D _whitePixel;
+        private TwitchStreamInfo _cachedTwitchStreamInfo;
 
         #region Texture Names
 
@@ -34,6 +37,7 @@ namespace CinemaModule.Services
         private const string ImportIconTexture = "icon_import.png";
 
         private const string YoutubeIconTexture = "icon_youtube.png";
+        private const string VlcIconTexture = "vlc-icon.png";
         private const string TvSideTexture = "tv_frame_side.png";
         private const string TvTopBottomTexture = "tv_frame_topbottom.png";
         private const string TvBackTexture = "tv_frame_back.png";
@@ -64,6 +68,7 @@ namespace CinemaModule.Services
         public AsyncTexture2D GetExportIcon() => GetTexture(ExportIconTexture);
         public AsyncTexture2D GetImportIcon() => GetTexture(ImportIconTexture);
         public AsyncTexture2D GetYoutubeIcon() => GetTexture(YoutubeIconTexture);
+        public AsyncTexture2D GetVlcIcon() => GetTexture(VlcIconTexture);
         public AsyncTexture2D GetDefaultAvatar() => GetTexture(CornerIconTexture);
         public AsyncTexture2D GetTvSide() => GetTexture(TvSideTexture);
         public AsyncTexture2D GetTvTopBottom() => GetTexture(TvTopBottomTexture);
@@ -98,6 +103,11 @@ namespace CinemaModule.Services
         public AsyncTexture2D GetWaypointIcon() => AsyncTexture2D.FromAssetId(156628);
         public AsyncTexture2D GetInfoIcon() => AsyncTexture2D.FromAssetId(1508665);
         public AsyncTexture2D GetRefreshIcon() => AsyncTexture2D.FromAssetId(156749);
+        public AsyncTexture2D GetWatchPartyIcon() => AsyncTexture2D.FromAssetId(156694);
+        public AsyncTexture2D GetArrowUpIcon() => AsyncTexture2D.FromAssetId(102617);
+        public AsyncTexture2D GetArrowDownIcon() => AsyncTexture2D.FromAssetId(102618);
+        public AsyncTexture2D GetTabbedWindowBackground() => AsyncTexture2D.FromAssetId(155985);
+        public AsyncTexture2D GetMenuItemFade() => AsyncTexture2D.FromAssetId(156044);
 
         #endregion
 
@@ -106,6 +116,95 @@ namespace CinemaModule.Services
         public async Task<AsyncTexture2D> GetImageFromUrlAsync(string cacheKey, string imageUrl)
         {
             return await _imageCache.GetImageAsync(cacheKey, imageUrl);
+        }
+
+        public async Task<AsyncTexture2D> GetYouTubeThumbnailAsync(string videoIdOrUrl)
+        {
+            if (string.IsNullOrWhiteSpace(videoIdOrUrl))
+                return null;
+
+            var videoId = YouTubeService.ExtractVideoId(videoIdOrUrl) ?? videoIdOrUrl;
+            var thumbnailUrl = $"https://img.youtube.com/vi/{videoId}/hqdefault.jpg";
+            return await GetImageFromUrlAsync($"youtube_thumb_{videoId}", thumbnailUrl);
+        }
+
+        public async Task<AsyncTexture2D> GetTwitchAvatarAsync(string channelName, string avatarUrl)
+        {
+            if (string.IsNullOrWhiteSpace(channelName) || string.IsNullOrWhiteSpace(avatarUrl))
+                return null;
+
+            return await GetImageFromUrlAsync($"twitch_avatar_{channelName}", avatarUrl);
+        }
+
+        public async Task<AsyncTexture2D> GetPresetImageAsync(string cacheKey, string imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(cacheKey) || string.IsNullOrWhiteSpace(imageUrl))
+                return null;
+
+            return await GetImageFromUrlAsync($"preset_{cacheKey}", imageUrl);
+        }
+
+        #endregion
+
+        #region Offline Textures
+
+        public void UpdateCachedStreamInfo(TwitchStreamInfo streamInfo)
+        {
+            _cachedTwitchStreamInfo = streamInfo;
+        }
+
+        public void ClearCachedStreamInfo()
+        {
+            _cachedTwitchStreamInfo = null;
+        }
+
+        public async Task<Texture2D> LoadOfflineTextureAsync(CinemaUserSettings userSettings, TwitchService twitchService)
+        {
+            if (userSettings.CurrentStreamSourceType == StreamSourceType.TwitchChannel)
+                return await LoadTwitchAvatarTextureAsync(userSettings, twitchService);
+
+            if (userSettings.CurrentStreamSourceType == StreamSourceType.YouTubeVideo)
+                return await LoadYouTubeThumbnailTextureAsync(userSettings);
+
+            return await LoadStaticImageTextureAsync(userSettings);
+        }
+
+        private async Task<Texture2D> LoadTwitchAvatarTextureAsync(CinemaUserSettings userSettings, TwitchService twitchService)
+        {
+            var channelName = userSettings.CurrentTwitchChannel;
+            if (string.IsNullOrEmpty(channelName))
+                return null;
+
+            var streamInfo = _cachedTwitchStreamInfo ?? await twitchService.GetStreamInfoAsync(channelName);
+            if (streamInfo == null || string.IsNullOrEmpty(streamInfo.AvatarUrl))
+                return null;
+
+            var avatarTexture = await GetTwitchAvatarAsync(channelName, streamInfo.AvatarUrl);
+            return avatarTexture?.Texture;
+        }
+
+        private async Task<Texture2D> LoadYouTubeThumbnailTextureAsync(CinemaUserSettings userSettings)
+        {
+            var videoId = userSettings.CurrentYouTubeVideo;
+            if (string.IsNullOrEmpty(videoId))
+                return null;
+
+            var asyncTexture = await GetYouTubeThumbnailAsync(videoId);
+            return asyncTexture?.Texture;
+        }
+
+        private async Task<Texture2D> LoadStaticImageTextureAsync(CinemaUserSettings userSettings)
+        {
+            var preset = userSettings.CurrentStreamPreset;
+            if (preset == null || string.IsNullOrEmpty(preset.StaticImage))
+                return null;
+
+            var asyncTexture = await GetImageFromUrlAsync($"offline_static_{preset.Id}", preset.StaticImage);
+
+            if (asyncTexture != null)
+                preset.StaticImageTexture = asyncTexture;
+
+            return asyncTexture?.Texture;
         }
 
         #endregion

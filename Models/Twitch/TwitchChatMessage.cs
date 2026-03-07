@@ -1,7 +1,7 @@
 using Microsoft.Xna.Framework;
 using System;
 
-namespace CinemaModule.Models
+namespace CinemaModule.Models.Twitch
 {
     public class TwitchChatMessage
     {

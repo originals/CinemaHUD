@@ -2,7 +2,7 @@ using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using System;
 
-namespace CinemaModule.Models
+namespace CinemaModule.Models.Location
 {
     public class WorldPosition3D
     {

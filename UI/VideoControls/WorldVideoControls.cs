@@ -137,6 +137,19 @@ namespace CinemaModule.UI.Controls
             }
         }
 
+        private bool _isWatchPartyViewer;
+        public bool IsWatchPartyViewer
+        {
+            get => _isWatchPartyViewer;
+            set
+            {
+                if (_isWatchPartyViewer == value) return;
+                _isWatchPartyViewer = value;
+                _base.IsWatchPartyViewer = value;
+                UpdateLayout();
+            }
+        }
+
         #endregion
 
         public WorldVideoControls()
@@ -175,6 +188,12 @@ namespace CinemaModule.UI.Controls
         {
             int centerY = PanelHeight / 2;
 
+            if (_isWatchPartyViewer)
+            {
+                _playPauseBounds = Rectangle.Empty;
+                return;
+            }
+
             _playPauseBounds = new Rectangle(
                 BaseVideoControls.ControlSpacing,
                 centerY - BaseVideoControls.IconSize / 2,
@@ -185,7 +204,9 @@ namespace CinemaModule.UI.Controls
         private void UpdateSeekBarBounds()
         {
             int centerY = PanelHeight / 2;
-            int nextX = _playPauseBounds.Right + BaseVideoControls.ControlSpacing;
+            int nextX = _isWatchPartyViewer
+                ? BaseVideoControls.ControlSpacing
+                : _playPauseBounds.Right + BaseVideoControls.ControlSpacing;
 
             if (ShowSeekBar)
             {
@@ -372,7 +393,7 @@ namespace CinemaModule.UI.Controls
 
             var localPos = new Point(e.MousePosition.X - AbsoluteBounds.X, e.MousePosition.Y - AbsoluteBounds.Y);
 
-            if (_playPauseBounds.Contains(localPos))
+            if (!_isWatchPartyViewer && _playPauseBounds.Contains(localPos))
             {
                 _base.RaisePlayPauseClicked();
                 return;
@@ -410,7 +431,7 @@ namespace CinemaModule.UI.Controls
             var mousePos = GameService.Input.Mouse.Position;
             var localPos = new Point(mousePos.X - AbsoluteBounds.X, mousePos.Y - AbsoluteBounds.Y);
 
-            _isHoveringPlayPause = _playPauseBounds.Contains(localPos);
+            _isHoveringPlayPause = !_isWatchPartyViewer && _playPauseBounds.Contains(localPos);
             _isHoveringVolume = _volumeIconBounds.Contains(localPos) || _base.VolumeTrackBar.MouseOver;
             _isHoveringSettings = _settingsBounds.Contains(localPos);
             _isHoveringTwitchChat = IsTwitchStream && _twitchChatBounds.Contains(localPos);
@@ -426,12 +447,15 @@ namespace CinemaModule.UI.Controls
 
             if (Opacity < 0.01f) return;
 
-            var playPauseRect = new Rectangle(
-                AbsoluteBounds.X + _playPauseBounds.X,
-                AbsoluteBounds.Y + _playPauseBounds.Y,
-                _playPauseBounds.Width,
-                _playPauseBounds.Height);
-            _base.Renderer.DrawPlayPauseButton(spriteBatch, playPauseRect, IsPaused, _isHoveringPlayPause, Opacity, false);
+            if (!_isWatchPartyViewer)
+            {
+                var playPauseRect = new Rectangle(
+                    AbsoluteBounds.X + _playPauseBounds.X,
+                    AbsoluteBounds.Y + _playPauseBounds.Y,
+                    _playPauseBounds.Width,
+                    _playPauseBounds.Height);
+                _base.Renderer.DrawPlayPauseButton(spriteBatch, playPauseRect, IsPaused, _isHoveringPlayPause, Opacity, false);
+            }
 
             if (ShowSeekBar)
             {
@@ -472,7 +496,7 @@ namespace CinemaModule.UI.Controls
 
         private void UpdateTooltip(Point localPos)
         {
-            if (_playPauseBounds.Contains(localPos))
+            if (!_isWatchPartyViewer && _playPauseBounds.Contains(localPos))
             {
                 BasicTooltipText = IsPaused ? "Play" : "Pause";
             }

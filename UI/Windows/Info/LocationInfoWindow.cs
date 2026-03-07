@@ -5,7 +5,7 @@ using CinemaModule.Models;
 using CinemaModule.Services;
 using Microsoft.Xna.Framework;
 
-namespace CinemaHUD.UI.Windows.Info
+namespace CinemaModule.UI.Windows.Info
 {
     public class LocationInfoWindow : StandardWindow
     {
@@ -22,7 +22,7 @@ namespace CinemaHUD.UI.Windows.Info
         {
             Parent = GameService.Graphics.SpriteScreen;
             Title = "Location Info";
-            Emblem = CinemaModule.CinemaModule.Instance.TextureService.GetEmblem();
+            Emblem = CinemaModule.Instance.TextureService.GetEmblem();
             Location = new Point(
                 (GameService.Graphics.SpriteScreen.Width - Width) / 2,
                 (GameService.Graphics.SpriteScreen.Height - Height) / 2);

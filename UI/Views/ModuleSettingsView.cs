@@ -1,8 +1,8 @@
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
 using Blish_HUD.Settings;
-using CinemaHUD.UI.Windows.SettingsSmall;
-using CinemaModule.Services;
+using CinemaModule.UI.Windows.Dialogs;
+using CinemaModule.Services.Twitch;
 using CinemaModule.Settings;
 using Microsoft.Xna.Framework;
 using System;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CinemaModule.Models.Location;
 using Newtonsoft.Json;
 
 namespace CinemaModule.Models
@@ -7,7 +8,8 @@ namespace CinemaModule.Models
     public enum StreamSourceType
     {
         Url,
-        TwitchChannel
+        TwitchChannel,
+        YouTubeVideo
     }
 
     public class SavedStream
@@ -27,16 +29,42 @@ namespace CinemaModule.Models
         [JsonProperty("createdAt")]
         public DateTime CreatedAt { get; set; }
 
+        [JsonProperty("tabId")]
+        public string TabId { get; set; }
+
         [JsonConstructor]
         public SavedStream() { }
 
-        public SavedStream(string name, StreamSourceType sourceType, string value)
+        public SavedStream(string name, StreamSourceType sourceType, string value, string tabId = null)
         {
             Id = IdGenerator.Generate();
             CreatedAt = DateTime.UtcNow;
             Name = name;
             SourceType = sourceType;
             Value = value;
+            TabId = tabId;
+        }
+    }
+
+    public class CustomStreamTab
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("createdAt")]
+        public DateTime CreatedAt { get; set; }
+
+        [JsonConstructor]
+        public CustomStreamTab() { }
+
+        public CustomStreamTab(string name)
+        {
+            Id = IdGenerator.Generate();
+            Name = name;
+            CreatedAt = DateTime.UtcNow;
         }
     }
 
@@ -44,5 +72,8 @@ namespace CinemaModule.Models
     {
         [JsonProperty("streams")]
         public List<SavedStream> Streams { get; set; } = new List<SavedStream>();
+
+        [JsonProperty("tabs")]
+        public List<CustomStreamTab> Tabs { get; set; } = new List<CustomStreamTab>();
     }
 }

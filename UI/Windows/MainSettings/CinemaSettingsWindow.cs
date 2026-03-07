@@ -2,13 +2,16 @@ using System;
 using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
-using CinemaModule;
+using CinemaModule.Controllers;
+using CinemaModule.Controllers.WatchParty;
 using CinemaModule.Services;
+using CinemaModule.Services.Twitch;
+using CinemaModule.Services.YouTube;
 using CinemaModule.Settings;
 using CinemaModule.UI.Windows.Info;
 using Microsoft.Xna.Framework;
 
-namespace CinemaHUD.UI.Windows.MainSettings
+namespace CinemaModule.UI.Windows.MainSettings
 {
     public class CinemaSettingsWindow : TabbedWindow2
     {
@@ -28,10 +31,15 @@ namespace CinemaHUD.UI.Windows.MainSettings
         private readonly TwitchService _twitchService;
         private readonly TwitchAuthService _twitchAuthService;
         private readonly PresetService _presetService;
+        private readonly YouTubeService _youtubeService;
+        private readonly WatchPartyController _watchPartyController;
 
         private ThirdPartyNoticesWindow _thirdPartyNoticesWindow;
         private StandardButton _infoButton;
         private int _fixedWidth;
+        private Tab _sourceTab;
+        private const string SourceTabName = "Channel guide";
+        private const string SourceTabDisabledName = "Channel guide (disabled while in Watch Party)";
 
         #endregion
 
@@ -40,12 +48,15 @@ namespace CinemaHUD.UI.Windows.MainSettings
             CinemaUserSettings userSettings,
             CinemaController controller,
             AsyncTexture2D emblemTexture,
+            AsyncTexture2D windowBackgroundTexture,
             Gw2MapService mapService,
             TwitchService twitchService,
             TwitchAuthService twitchAuthService,
-            PresetService presetService)
+            PresetService presetService,
+            YouTubeService youtubeService,
+            WatchPartyController watchPartyController)
             : base(
-                AsyncTexture2D.FromAssetId(155985),
+                windowBackgroundTexture,
                 new Rectangle(40, 26, WindowWidth, BackgroundHeight),
                 new Rectangle(70, 36, ContentWidth, BackgroundHeight - ContentHeightOffset))
         {
@@ -56,6 +67,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _twitchService = twitchService;
             _twitchAuthService = twitchAuthService;
             _presetService = presetService;
+            _youtubeService = youtubeService;
+            _watchPartyController = watchPartyController;
 
             Parent = GameService.Graphics.SpriteScreen;
             Title = "CinemaHUD";
@@ -72,7 +85,10 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
             TabChanged += OnTabChanged;
             Resized += OnWindowResized;
+            _watchPartyController.RoomJoined += OnWatchPartyRoomChanged;
+            _watchPartyController.RoomLeft += OnWatchPartyRoomChanged;
             UpdateSubtitleForCurrentTab();
+            UpdateSourceTabEnabled();
 
             ApplySavedHeight();
         }
@@ -96,14 +112,18 @@ namespace CinemaHUD.UI.Windows.MainSettings
 
         private void BuildTabs()
         {
-            var displayIcon = CinemaModule.CinemaModule.Instance.TextureService.GetDisplayIcon();
-            var sourceIcon = CinemaModule.CinemaModule.Instance.TextureService.GetSourceIcon();
+            var displayIcon = CinemaModule.Instance.TextureService.GetDisplayIcon();
+            var sourceIcon = CinemaModule.Instance.TextureService.GetSourceIcon();
+            var watchPartyIcon = CinemaModule.Instance.TextureService.GetWatchPartyIcon();
 
             var displayTab = new Tab(displayIcon, () => new DisplayTabView(_settings, _userSettings, _controller, _mapService, _presetService), "Display settings");
             Tabs.Add(displayTab);
 
-            var sourceTab = new Tab(sourceIcon, () => new SourceTabView(_userSettings, _controller, _twitchService, _twitchAuthService, _presetService), "Channel guide");
-            Tabs.Add(sourceTab);
+            _sourceTab = new Tab(sourceIcon, () => new SourceTabView(_userSettings, _controller, _twitchService, _twitchAuthService, _presetService, _youtubeService), SourceTabName);
+            Tabs.Add(_sourceTab);
+
+            var watchPartyTab = new Tab(watchPartyIcon, () => new WatchPartyTabView(_watchPartyController, _youtubeService, _userSettings, _controller), "Watch Party");
+            Tabs.Add(watchPartyTab);
         }
 
         private void BuildInfoButton()
@@ -171,10 +191,21 @@ namespace CinemaHUD.UI.Windows.MainSettings
             _infoButton.Location = new Point(ContentRegion.Width - 150, ContentRegion.Height + 10);
         }
 
+        private void OnWatchPartyRoomChanged(object sender, EventArgs e) => UpdateSourceTabEnabled();
+
+        private void UpdateSourceTabEnabled()
+        {
+            bool inRoom = _watchPartyController.IsInRoom;
+            _sourceTab.Enabled = !inRoom;
+            _sourceTab.Name = inRoom ? SourceTabDisabledName : SourceTabName;
+        }
+
         #endregion
 
         protected override void DisposeControl()
         {
+            _watchPartyController.RoomJoined -= OnWatchPartyRoomChanged;
+            _watchPartyController.RoomLeft -= OnWatchPartyRoomChanged;
             _infoButton?.Dispose();
             _thirdPartyNoticesWindow?.Dispose();
             base.DisposeControl();

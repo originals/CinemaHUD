@@ -4,38 +4,38 @@ using Blish_HUD;
 using CinemaModule.Models;
 using CinemaModule.VideoPlayer;
 using VideoPlayerClass = CinemaModule.VideoPlayer.VideoPlayer;
-using CinemaModule.Services;
+using CinemaModule.Services.Twitch;
+using CinemaModule.Services.YouTube;
 using CinemaModule.Settings;
-using CinemaModule.UI.VideoDisplays;
 
 namespace CinemaModule.Controllers
 {
-    public class TwitchStreamRefreshedEventArgs : EventArgs
-    {
-        public string ChannelName { get; }
-        public string StreamUrl { get; }
-
-        public TwitchStreamRefreshedEventArgs(string channelName, string streamUrl)
-        {
-            ChannelName = channelName;
-            StreamUrl = streamUrl;
-        }
-    }
-
     public class PlaybackController : IDisposable
     {
+        #region Members
+
         private static readonly Logger Logger = Logger.GetLogger<PlaybackController>();
 
         private readonly CinemaSettings _moduleSettings;
         private readonly CinemaUserSettings _userSettings;
         private readonly TwitchService _twitchService;
+        private readonly YouTubeService _youtubeService;
 
         private VideoPlayerClass _videoPlayer;
         private bool _isPausedDueToRange;
         private bool _isDisposed;
 
+        #endregion
+
+        #region Events
+
         public event EventHandler<TwitchStreamRefreshedEventArgs> StreamUrlRefreshed;
+        public event EventHandler<YouTubeStreamRefreshedEventArgs> YouTubeStreamUrlRefreshed;
         public event EventHandler<PlaybackState> PlaybackStateChanged;
+
+        #endregion
+
+        #region Properties
 
         public bool IsPausedDueToRange => _isPausedDueToRange;
 
@@ -43,12 +43,29 @@ namespace CinemaModule.Controllers
             _videoPlayer.IsEnded || 
             (!_videoPlayer.IsPlaying && !_videoPlayer.IsPaused);
 
-        public PlaybackController(CinemaSettings moduleSettings, CinemaUserSettings userSettings, TwitchService twitchService)
+        public bool IsPlaying => _videoPlayer?.IsPlaying ?? false;
+
+        public bool IsPaused => _videoPlayer?.IsPaused ?? false;
+
+        public bool IsBuffering => _videoPlayer?.IsBuffering ?? false;
+
+        public bool IsSeekable => _videoPlayer?.IsSeekable ?? false;
+
+        public long Duration => _videoPlayer?.Length ?? 0;
+
+        public float Position => _videoPlayer?.Position ?? 0f;
+
+        #endregion
+
+        public PlaybackController(CinemaSettings moduleSettings, CinemaUserSettings userSettings, TwitchService twitchService, YouTubeService youtubeService)
         {
             _moduleSettings = moduleSettings;
             _userSettings = userSettings;
             _twitchService = twitchService;
+            _youtubeService = youtubeService;
         }
+
+        #region Registration
 
         public void RegisterPlayer(VideoPlayerClass player)
         {
@@ -58,16 +75,35 @@ namespace CinemaModule.Controllers
 
         public void StartInitialPlaybackIfEnabled()
         {
-            if (!_moduleSettings.IsEnabled || string.IsNullOrEmpty(_userSettings.StreamUrl))
+            if (!_moduleSettings.IsEnabled)
                 return;
 
-            _videoPlayer.Play(_userSettings.StreamUrl);
+            bool autoplay = _userSettings.AutoplayOnStartup;
 
             if (_userSettings.CurrentStreamSourceType == StreamSourceType.TwitchChannel)
             {
                 var channelName = _userSettings.CurrentTwitchChannel;
                 if (!string.IsNullOrEmpty(channelName))
-                    _twitchService.FetchAndCacheQualitiesAsync(channelName);
+                {
+                    _ = RefreshTwitchStreamAsync(autoplay);
+                    return;
+                }
+            }
+            else if (_userSettings.CurrentStreamSourceType == StreamSourceType.YouTubeVideo)
+            {
+                var videoId = _userSettings.CurrentYouTubeVideo;
+                if (!string.IsNullOrEmpty(videoId))
+                {
+                    _ = RefreshYouTubeStreamAsync(autoplay);
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_userSettings.StreamUrl))
+            {
+                _videoPlayer.Play(_userSettings.StreamUrl);
+                if (!autoplay)
+                    _videoPlayer.Pause();
             }
         }
 
@@ -76,25 +112,24 @@ namespace CinemaModule.Controllers
             PlaybackStateChanged?.Invoke(this, e.State);
         }
 
+        #endregion
+
+        #region Playback Control
+
         public void Update()
         {
             _videoPlayer?.Update();
         }
 
-        public void Play(string url)
-        {
-            _videoPlayer?.Play(url);
-        }
+        public void Play(string url) => _videoPlayer?.Play(url);
 
-        public void Stop()
-        {
-            _videoPlayer?.Stop();
-        }
+        public void Stop() => _videoPlayer?.Stop();
 
-        public void TogglePause()
-        {
-            _videoPlayer?.TogglePause();
-        }
+        public void TogglePause() => _videoPlayer?.TogglePause();
+
+        public void Pause() => _videoPlayer?.Pause();
+
+        public void Resume() => _videoPlayer?.Resume();
 
         public void SetVolume(int volume)
         {
@@ -102,45 +137,41 @@ namespace CinemaModule.Controllers
                 _videoPlayer.Volume = volume;
         }
 
-        public void SetQuality(int qualityIndex)
-        {
-            _videoPlayer?.SetQuality(qualityIndex);
-        }
+        public void SetQuality(int qualityIndex) => _videoPlayer?.SetQuality(qualityIndex);
 
         public void Seek(float position)
         {
-            if (_videoPlayer != null)
-                _videoPlayer.Position = position;
+            if (_videoPlayer == null || float.IsNaN(position) || float.IsInfinity(position))
+                return;
+
+            _videoPlayer.Position = Math.Max(0f, Math.Min(1f, position));
         }
 
-        public bool IsSeekable => _videoPlayer?.IsSeekable ?? false;
+        #endregion
 
-        public long Duration => _videoPlayer?.Length ?? 0;
-
-        public float Position => _videoPlayer?.Position ?? 0f;
+        #region Event Handlers
 
         public void HandleStreamUrlChanged(string url)
         {
-            if (_videoPlayer == null)
+            if (_videoPlayer == null || !_moduleSettings.IsEnabled)
                 return;
 
-            _twitchService.ClearCachedQualities();
-
-            if (!_moduleSettings.IsEnabled || string.IsNullOrEmpty(url))
+            if (string.IsNullOrEmpty(url))
+            {
+                _videoPlayer.Stop();
                 return;
+            }
 
             if (_videoPlayer.CurrentUrl == url)
                 return;
 
+            _twitchService.ClearCachedQualities();
+            _youtubeService.ClearCachedQualities();
+
             _videoPlayer.Stop();
             _videoPlayer.Play(url);
 
-            if (_userSettings.CurrentStreamSourceType == StreamSourceType.TwitchChannel)
-            {
-                var channelName = _userSettings.CurrentTwitchChannel;
-                if (!string.IsNullOrEmpty(channelName))
-                    _twitchService.FetchAndCacheQualitiesAsync(channelName);
-            }
+            FetchQualitiesForCurrentSource();
         }
 
         public void HandleEnabledChanged(bool isEnabled)
@@ -154,24 +185,12 @@ namespace CinemaModule.Controllers
                 return;
             }
 
-            if (_userSettings.CurrentStreamSourceType == StreamSourceType.TwitchChannel)
-            {
-                _ = RefreshTwitchStreamAndPlayAsync();
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(_userSettings.StreamUrl))
-            {
-                _videoPlayer.Play(_userSettings.StreamUrl);
-            }
+            StartPlaybackForCurrentSource();
         }
 
         public void RestartPlaybackIfNeeded()
         {
-            if (!_moduleSettings.IsEnabled)
-                return;
-
-            if (string.IsNullOrEmpty(_userSettings.StreamUrl))
+            if (!_moduleSettings.IsEnabled || string.IsNullOrEmpty(_userSettings.StreamUrl))
                 return;
 
             if (_videoPlayer == null || _videoPlayer.IsPlaying)
@@ -191,17 +210,23 @@ namespace CinemaModule.Controllers
             {
                 _videoPlayer.Pause();
                 _isPausedDueToRange = true;
-                return;
             }
-
-            if (!shouldPause && _isPausedDueToRange)
+            else if (!shouldPause && _isPausedDueToRange)
             {
                 _videoPlayer.Resume();
                 _isPausedDueToRange = false;
             }
         }
 
-        public async Task RefreshTwitchStreamAndPlayAsync()
+        #endregion
+
+        #region Stream Refresh
+
+        public async Task RefreshTwitchStreamAndPlayAsync() => await RefreshTwitchStreamAsync(autoplay: true);
+
+        public async Task RefreshYouTubeStreamAndPlayAsync(YouTubeVideoInfo videoInfo = null) => await RefreshYouTubeStreamAsync(autoplay: true, videoInfo);
+
+        public async Task RefreshTwitchStreamAsync(bool autoplay)
         {
             var channelName = _userSettings.CurrentTwitchChannel;
             if (string.IsNullOrEmpty(channelName))
@@ -219,7 +244,7 @@ namespace CinemaModule.Controllers
                     return;
                 }
 
-                PlayTwitchStream(freshUrl, channelName);
+                PlayTwitchStream(freshUrl, channelName, autoplay);
                 StreamUrlRefreshed?.Invoke(this, new TwitchStreamRefreshedEventArgs(channelName, freshUrl));
             }
             catch (Exception ex)
@@ -228,11 +253,100 @@ namespace CinemaModule.Controllers
             }
         }
 
-        private void PlayTwitchStream(string streamUrl, string channelName)
+        public async Task RefreshYouTubeStreamAsync(bool autoplay, YouTubeVideoInfo videoInfo = null)
         {
-            _videoPlayer.Play(streamUrl);
+            var videoId = _userSettings.CurrentYouTubeVideo;
+            if (string.IsNullOrEmpty(videoId))
+            {
+                Logger.Warn("Cannot refresh YouTube stream - no video ID");
+                return;
+            }
+
+            try
+            {
+                videoInfo = videoInfo ?? await _youtubeService.GetVideoInfoAsync(videoId);
+                var freshUrl = videoInfo?.IsLiveStream == true
+                    ? await _youtubeService.GetLiveStreamUrlAsync(videoId)
+                    : await _youtubeService.GetPlayableStreamUrlAsync(videoId);
+
+                if (string.IsNullOrEmpty(freshUrl))
+                {
+                    Logger.Warn($"Failed to get fresh stream URL for video: {videoId}");
+                    return;
+                }
+
+                PlayYouTubeStream(freshUrl, videoId, autoplay);
+                YouTubeStreamUrlRefreshed?.Invoke(this, new YouTubeStreamRefreshedEventArgs(videoId, freshUrl));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to refresh YouTube stream for video: {videoId}");
+            }
+        }
+
+        #endregion
+
+        #region Private Helpers
+
+        private void PlayTwitchStream(string streamUrl, string channelName, bool autoplay = true)
+        {
+            PlayAndPauseIfNeeded(streamUrl, autoplay);
             _twitchService.FetchAndCacheQualitiesAsync(channelName);
         }
+
+        private void PlayYouTubeStream(string streamUrl, string videoId, bool autoplay = true)
+        {
+            PlayAndPauseIfNeeded(streamUrl, autoplay);
+            _ = _youtubeService.FetchAndCacheQualitiesAsync(videoId);
+        }
+
+        private void PlayAndPauseIfNeeded(string url, bool autoplay)
+        {
+            _videoPlayer.Play(url);
+            if (!autoplay)
+                _videoPlayer.Pause();
+        }
+
+        private void FetchQualitiesForCurrentSource()
+        {
+            switch (_userSettings.CurrentStreamSourceType)
+            {
+                case StreamSourceType.TwitchChannel:
+                    var channelName = _userSettings.CurrentTwitchChannel;
+                    if (!string.IsNullOrEmpty(channelName))
+                        _twitchService.FetchAndCacheQualitiesAsync(channelName);
+                    break;
+
+                case StreamSourceType.YouTubeVideo:
+                    var videoId = _userSettings.CurrentYouTubeVideo;
+                    if (!string.IsNullOrEmpty(videoId))
+                        _ = _youtubeService.FetchAndCacheQualitiesAsync(videoId);
+                    break;
+            }
+        }
+
+        private void StartPlaybackForCurrentSource()
+        {
+            switch (_userSettings.CurrentStreamSourceType)
+            {
+                case StreamSourceType.TwitchChannel:
+                    _ = RefreshTwitchStreamAndPlayAsync();
+                    break;
+
+                case StreamSourceType.YouTubeVideo:
+                    _ = RefreshYouTubeStreamAndPlayAsync();
+                    break;
+
+                default:
+                    if (!string.IsNullOrEmpty(_userSettings.StreamUrl))
+                        _videoPlayer.Play(_userSettings.StreamUrl);
+                    break;
+            }
+        }
+
+        #endregion
+
+        #region IDisposable
 
         public void Dispose()
         {
@@ -240,12 +354,12 @@ namespace CinemaModule.Controllers
                 return;
 
             if (_videoPlayer != null)
-            {
                 _videoPlayer.PlaybackStateChanged -= OnPlaybackStateChanged;
-            }
 
             _isPausedDueToRange = false;
             _isDisposed = true;
         }
+
+        #endregion
     }
 }

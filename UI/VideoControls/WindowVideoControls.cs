@@ -103,6 +103,8 @@ namespace CinemaModule.UI.Controls
             SeekBar.Visible = ShouldDraw && _isSeekable && !IsTwitchStream;
         }
 
+        private bool ShowTimeDisplay => _isSeekable && !IsTwitchStream;
+
         #region Public Methods
 
         public void Update(Rectangle panelBounds)
@@ -172,7 +174,7 @@ namespace CinemaModule.UI.Controls
 
         private void UpdateSeekBarBounds(Vector2 bottomRight, Vector2 bottomLeft)
         {
-            if (!_isSeekable || IsTwitchStream) return;
+            if (!ShowTimeDisplay) return;
 
             int bottomY = _volumeIconBounds.Y;
 
@@ -291,7 +293,7 @@ namespace CinemaModule.UI.Controls
         {
             var mousePos = GameService.Input.Mouse.Position;
             _isHoveringPanel = _panelBounds.Contains(mousePos);
-            _isHoveringPlayPause = _isHoveringPanel && _playPauseBounds.Contains(mousePos);
+            _isHoveringPlayPause = !IsWatchPartyViewer && _isHoveringPanel && _playPauseBounds.Contains(mousePos);
             _isHoveringVolume = _isHoveringPanel && (_volumeControlBounds.Contains(mousePos) || VolumeTrackBar.MouseOver);
             _isHoveringSettings = _isHoveringPanel && _settingsBounds.Contains(mousePos);
             _isHoveringTwitchChat = IsTwitchStream && _isHoveringPanel && _twitchChatBounds.Contains(mousePos);
@@ -322,7 +324,7 @@ namespace CinemaModule.UI.Controls
                 return;
             }
 
-            if (_isHoveringPlayPause)
+            if (!IsWatchPartyViewer && _isHoveringPlayPause)
             {
                 CurrentTooltip = IsPaused ? "Play" : "Pause";
             }
@@ -369,7 +371,7 @@ namespace CinemaModule.UI.Controls
                 return true;
             }
 
-            if (_playPauseBounds.Contains(mousePosition))
+            if (!IsWatchPartyViewer && _playPauseBounds.Contains(mousePosition))
             {
                 RaisePlayPauseClicked();
                 return true;
@@ -411,7 +413,7 @@ namespace CinemaModule.UI.Controls
                 return true;
             }
 
-            if (_isSeekable && !IsTwitchStream && _seekBarBackgroundBounds.Contains(mousePosition))
+            if (_isSeekable && !IsTwitchStream && !IsWatchPartyViewer && _seekBarBackgroundBounds.Contains(mousePosition))
             {
                 return true;
             }
@@ -441,7 +443,7 @@ namespace CinemaModule.UI.Controls
 
         private void DrawSeekBarControls(SpriteBatch spriteBatch)
         {
-            if (!_isSeekable || IsTwitchStream) return;
+            if (!ShowTimeDisplay) return;
 
             Renderer.DrawSeekBarBackground(spriteBatch, _seekBarBackgroundBounds, Opacity);
             Renderer.DrawTimeText(spriteBatch, FormatTimeDisplay(), _timeDisplayBounds, Opacity);
@@ -449,6 +451,8 @@ namespace CinemaModule.UI.Controls
 
         private void DrawPlayPauseButton(SpriteBatch spriteBatch)
         {
+            if (IsWatchPartyViewer) return;
+
             var drawBounds = _playPauseBounds;
             if (_isHoveringPlayPause)
             {

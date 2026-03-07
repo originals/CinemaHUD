@@ -1,4 +1,4 @@
-using CinemaModule.Models;
+using CinemaModule.Models.Location;
 using Microsoft.Xna.Framework;
 
 namespace CinemaModule.UI.VideoDisplays.Rendering

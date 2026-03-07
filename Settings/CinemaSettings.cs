@@ -1,3 +1,4 @@
+using System;
 using Blish_HUD.Settings;
 using CinemaModule.UI.Windows.Info;
 
@@ -9,7 +10,7 @@ namespace CinemaModule.Settings
         InGame
     }
 
-    public class CinemaSettings
+    public class CinemaSettings : IDisposable
     {
         public SettingEntry<bool> EnabledSetting { get; }
 

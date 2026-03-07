@@ -2,7 +2,10 @@ using Blish_HUD;
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using CinemaModule.Models;
+using CinemaModule.Models.Twitch;
 using CinemaModule.Services;
+using CinemaModule.Services.Twitch;
+using CinemaModule.Services.YouTube;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
@@ -11,7 +14,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace CinemaHUD.UI.Windows.MainSettings
+namespace CinemaModule.UI.Windows.MainSettings
 {
     public class StreamStatus
     {
@@ -42,6 +45,20 @@ namespace CinemaHUD.UI.Windows.MainSettings
             IsOnline = true,
             Subtitle = "Playback Ready",
             SubtitleColor = new Color(180, 200, 220)
+        };
+
+        public static StreamStatus YouTubeAvailable(string title) => new StreamStatus
+        {
+            IsOnline = true,
+            Subtitle = $"Available - {title}",
+            SubtitleColor = AvailableColor
+        };
+
+        public static StreamStatus YouTubeInvalid() => new StreamStatus
+        {
+            IsOnline = false,
+            Subtitle = "Invalid",
+            SubtitleColor = new Color(200, 80, 80)
         };
 
         public static StreamStatus Live(string gameName, int viewerCount) => new StreamStatus
@@ -134,7 +151,7 @@ namespace CinemaHUD.UI.Windows.MainSettings
             Action onDelete, Action onEdit, Action<SavedStream> onSelect)
         {
             var buttons = CreateCustomButtons(stream, onDelete, onEdit);
-            var effectiveStatus = status ?? new StreamStatus { Subtitle = stream.Value };
+            var effectiveStatus = status ?? new StreamStatus { Subtitle = "Loading..." };
             var card = CreateCard(parent, key, stream.Name, effectiveStatus, buttons, _textureService.GetDefaultAvatar());
             card.Click += (s, e) => onSelect(stream);
             return card;
@@ -155,8 +172,8 @@ namespace CinemaHUD.UI.Windows.MainSettings
             var twitchUrl = _twitchService.GetChannelUrl(channelName);
             return new List<ListCardButton>
             {
-                CreateIconButton(_textureService.GetInfoIcon(), "Open in Browser", () => OpenUrl(twitchUrl)),
-                CreateIconButton(_textureService.GetTwitchChatIcon(), "Open Chat", () => OnOpenChat?.Invoke(channelName))
+                CreateIconButton(_textureService.GetInfoIcon(), "Open channel in browser", () => OpenUrl(twitchUrl)),
+                CreateIconButton(_textureService.GetTwitchChatIcon(), "Open Twitch chat", () => OnOpenChat?.Invoke(channelName))
             };
         }
 
@@ -167,29 +184,29 @@ namespace CinemaHUD.UI.Windows.MainSettings
             if (channel.IsTwitchChannel && !string.IsNullOrEmpty(channel.TwitchName))
             {
                 var twitchUrl = _twitchService.GetChannelUrl(channel.TwitchName);
-                buttons.Add(CreateIconButton(_textureService.GetInfoIcon(), "Open in Browser", () => OpenUrl(twitchUrl)));
-                buttons.Add(CreateIconButton(_textureService.GetTwitchChatIcon(), "Open Chat", () => OnOpenChat?.Invoke(channel.TwitchName)));
+                buttons.Add(CreateIconButton(_textureService.GetInfoIcon(), "Open channel in browser", () => OpenUrl(twitchUrl)));
+                buttons.Add(CreateIconButton(_textureService.GetTwitchChatIcon(), "Open Twitch chat", () => OnOpenChat?.Invoke(channel.TwitchName)));
             }
             else if (!string.IsNullOrEmpty(channel?.InfoUrl))
             {
-                buttons.Add(CreateIconButton(_textureService.GetInfoIcon(), "Open in Browser", () => OpenUrl(channel.InfoUrl)));
+                buttons.Add(CreateIconButton(_textureService.GetInfoIcon(), "Open in browser", () => OpenUrl(channel.InfoUrl)));
             }
 
             if (!string.IsNullOrEmpty(channel?.YoutubeUrl))
                 buttons.Add(CreateIconButton(_textureService.GetYoutubeIcon(), "Watch on YouTube", () => OpenUrl(channel.YoutubeUrl)));
             if (!string.IsNullOrEmpty(channel?.Waypoint))
-                buttons.Add(CreateIconButton(_textureService.GetWaypointIcon(), "Copy Waypoint", () => OnCopyWaypoint?.Invoke(channel.Waypoint)));
+                buttons.Add(CreateIconButton(_textureService.GetWaypointIcon(), "Copy waypoint to clipboard", () => OnCopyWaypoint?.Invoke(channel.Waypoint)));
             if (channel?.HasWorldPosition == true)
-                buttons.Add(CreateIconButton(_textureService.GetSetScreenIcon(), "Set Ingame Screen Position", () => OnApplyWorldPosition?.Invoke(channel)));
+                buttons.Add(CreateIconButton(_textureService.GetSetScreenIcon(), "Apply in-game screen position", () => OnApplyWorldPosition?.Invoke(channel)));
             return buttons;
         }
 
         private List<ListCardButton> CreateCustomButtons(SavedStream stream, Action onDelete, Action onEdit)
         {
-            var buttons = new List<ListCardButton> { CreateIconButton(_textureService.GetDeleteIcon(), "Delete", onDelete) };
+            var buttons = new List<ListCardButton> { CreateIconButton(_textureService.GetDeleteIcon(), "Delete this source", onDelete) };
             if (stream.SourceType == StreamSourceType.TwitchChannel)
-                buttons.Add(CreateIconButton(_textureService.GetTwitchChatIcon(), "Open Chat", () => OnOpenChat?.Invoke(stream.Value)));
-            buttons.Add(new ListCardButton { Text = "Edit", Width = 50, OnClick = onEdit });
+                buttons.Add(CreateIconButton(_textureService.GetTwitchChatIcon(), "Open Twitch chat", () => OnOpenChat?.Invoke(stream.Value)));
+            buttons.Add(new ListCardButton { Text = "Edit", Width = 50, Tooltip = "Edit this source", OnClick = onEdit });
             return buttons;
         }
 
@@ -213,8 +230,13 @@ namespace CinemaHUD.UI.Windows.MainSettings
     {
         private static readonly Logger Logger = Logger.GetLogger<StreamStatusLoader>();
         private readonly TwitchService _twitchService;
+        private readonly YouTubeService _youtubeService;
 
-        public StreamStatusLoader(TwitchService twitchService) => _twitchService = twitchService;
+        public StreamStatusLoader(TwitchService twitchService, YouTubeService youtubeService)
+        {
+            _twitchService = twitchService;
+            _youtubeService = youtubeService;
+        }
 
         public async Task FetchTwitchStatusesAsync(List<StreamListItem> items, CancellationToken token)
         {
@@ -274,10 +296,12 @@ namespace CinemaHUD.UI.Windows.MainSettings
             var statusMap = new Dictionary<string, StreamStatus>();
             var twitchStreams = streams.Where(s => s.SourceType == StreamSourceType.TwitchChannel).ToList();
             var urlStreams = streams.Where(s => s.SourceType == StreamSourceType.Url).ToList();
+            var youtubeStreams = streams.Where(s => s.SourceType == StreamSourceType.YouTubeVideo).ToList();
 
             await Task.WhenAll(
                 FetchTwitchCustomStatusesAsync(twitchStreams, statusMap, token),
-                FetchUrlCustomStatusesAsync(urlStreams, statusMap, token));
+                FetchUrlCustomStatusesAsync(urlStreams, statusMap, token),
+                FetchYouTubeCustomStatusesAsync(youtubeStreams, statusMap, token));
             return statusMap;
         }
 
@@ -333,6 +357,29 @@ namespace CinemaHUD.UI.Windows.MainSettings
                 if (!token.IsCancellationRequested)
                     Logger.Debug($"Failed to fetch Twitch statuses for custom streams: {ex.Message}");
             }
+        }
+
+        private async Task FetchYouTubeCustomStatusesAsync(List<SavedStream> youtubeStreams,
+            Dictionary<string, StreamStatus> statusMap, CancellationToken token)
+        {
+            if (youtubeStreams.Count == 0) return;
+
+            var tasks = youtubeStreams.Select(async stream =>
+            {
+                try
+                {
+                    var info = await _youtubeService.GetVideoInfoAsync(stream.Value);
+                    if (token.IsCancellationRequested) return;
+                    statusMap[stream.Id] = info != null ? StreamStatus.YouTubeAvailable(info.Title) : StreamStatus.YouTubeInvalid();
+                }
+                catch (Exception ex)
+                {
+                    if (token.IsCancellationRequested) return;
+                    Logger.Debug($"Failed to check YouTube status for {stream.Name}: {ex.Message}");
+                    statusMap[stream.Id] = StreamStatus.YouTubeInvalid();
+                }
+            });
+            await Task.WhenAll(tasks);
         }
 
         private async Task FetchUrlCustomStatusesAsync(List<SavedStream> urlStreams,

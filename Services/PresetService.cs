@@ -3,7 +3,6 @@ using CinemaModule.Models;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -14,12 +13,11 @@ namespace CinemaModule.Services
     {
         private static readonly Logger Logger = Logger.GetLogger<PresetService>();
         private const string DefaultApiBaseUrl = "https://www.gw2opus.com/wp-json/cinemahud/v3";
-        private const string ImageCacheSubfolder = "presets";
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
         private readonly HttpClient _httpClient;
         private readonly string _apiBaseUrl;
-        private readonly ImageCacheService _imageCache;
+        private readonly TextureService _textureService;
 
         private PresetsResponse _cachedPresets;
         private bool _isLoaded;
@@ -59,18 +57,15 @@ namespace CinemaModule.Services
         public event EventHandler PresetsLoaded;
         public event EventHandler PresetImagesLoaded;
 
-
-        public PresetService(string cacheDirectory) : this(cacheDirectory, DefaultApiBaseUrl)
+        public PresetService(TextureService textureService) : this(textureService, DefaultApiBaseUrl)
         {
         }
 
-        public PresetService(string cacheDirectory, string apiBaseUrl)
+        public PresetService(TextureService textureService, string apiBaseUrl)
         {
+            _textureService = textureService;
             _apiBaseUrl = apiBaseUrl;
             _httpClient = new HttpClient { Timeout = RequestTimeout };
-
-            var imageCacheDir = Path.Combine(cacheDirectory, ImageCacheSubfolder);
-            _imageCache = new ImageCacheService(imageCacheDir, _httpClient);
         }
 
         public async Task LoadPresetsAsync()
@@ -153,13 +148,13 @@ namespace CinemaModule.Services
             if (string.IsNullOrEmpty(category.Icon))
                 return;
 
-            category.IconTexture = await _imageCache.GetImageAsync($"loc_cat_{category.Id}_icon", category.Icon);
+            category.IconTexture = await _textureService.GetPresetImageAsync($"loc_cat_{category.Id}_icon", category.Icon);
         }
 
         private async Task LoadImagesForWorldLocationAsync(WorldLocationPresetData preset)
         {
-            var avatarTask = _imageCache.GetImageAsync($"{preset.Id}_avatar", preset.Avatar);
-            var pictureTask = _imageCache.GetImageAsync($"{preset.Id}_picture", preset.Picture);
+            var avatarTask = _textureService.GetPresetImageAsync($"{preset.Id}_avatar", preset.Avatar);
+            var pictureTask = _textureService.GetPresetImageAsync($"{preset.Id}_picture", preset.Picture);
 
             await Task.WhenAll(avatarTask, pictureTask);
 
@@ -172,7 +167,7 @@ namespace CinemaModule.Services
             if (string.IsNullOrEmpty(category.Icon))
                 return;
 
-            category.IconTexture = await _imageCache.GetImageAsync($"cat_{category.Id}_icon", category.Icon);
+            category.IconTexture = await _textureService.GetPresetImageAsync($"cat_{category.Id}_icon", category.Icon);
         }
 
         private async Task LoadImagesForChannelAsync(ChannelData channel)
@@ -181,13 +176,13 @@ namespace CinemaModule.Services
 
             if (!string.IsNullOrEmpty(channel.Avatar))
             {
-                tasks.Add(_imageCache.GetImageAsync($"ch_{channel.Id}_avatar", channel.Avatar)
+                tasks.Add(_textureService.GetPresetImageAsync($"ch_{channel.Id}_avatar", channel.Avatar)
                     .ContinueWith(t => channel.AvatarTexture = t.Result, TaskContinuationOptions.OnlyOnRanToCompletion));
             }
 
             if (!string.IsNullOrEmpty(channel.StaticImage))
             {
-                tasks.Add(_imageCache.GetImageAsync($"ch_{channel.Id}_static", channel.StaticImage)
+                tasks.Add(_textureService.GetPresetImageAsync($"ch_{channel.Id}_static", channel.StaticImage)
                     .ContinueWith(t => channel.StaticImageTexture = t.Result, TaskContinuationOptions.OnlyOnRanToCompletion));
             }
 
@@ -197,7 +192,6 @@ namespace CinemaModule.Services
 
         public void Dispose()
         {
-            _imageCache?.Dispose();
             _httpClient?.Dispose();
         }
     }

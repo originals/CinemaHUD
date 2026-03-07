@@ -37,6 +37,7 @@ namespace CinemaModule.VideoPlayer
         private List<VideoQuality> _availableQualities = new List<VideoQuality>();
         private int _selectedQualityIndex = -1;
         private volatile bool _qualitiesNeedRefresh;
+        private PlaybackState _lastReportedState = PlaybackState.Stopped;
 
         #endregion
 
@@ -59,6 +60,15 @@ namespace CinemaModule.VideoPlayer
         public bool IsPaused => _mediaPlayer?.State == VLCState.Paused;
 
         public bool IsEnded => _mediaPlayer?.State == VLCState.Ended;
+
+        public bool IsBuffering
+        {
+            get
+            {
+                var state = _mediaPlayer?.State;
+                return state == VLCState.Buffering || state == VLCState.Opening;
+            }
+        }
 
         public int Volume
         {
@@ -125,7 +135,7 @@ namespace CinemaModule.VideoPlayer
 
         private string[] BuildLibVlcOptions(VideoPlayerOptions options)
         {
-            var optionsList = new System.Collections.Generic.List<string>
+            var optionsList = new List<string>
             {
                 "--no-osd",
                 $"--network-caching={options.NetworkCachingMs}",
@@ -162,26 +172,7 @@ namespace CinemaModule.VideoPlayer
 
         private void SetupEventHandlers()
         {
-            _mediaPlayer.Playing += (s, e) => 
-            {
-                OnPlaybackStateChanged(PlaybackState.Playing);
-                _qualitiesNeedRefresh = true;
-            };
-            _mediaPlayer.Paused += (s, e) => OnPlaybackStateChanged(PlaybackState.Paused);
-            _mediaPlayer.Stopped += (s, e) => OnPlaybackStateChanged(PlaybackState.Stopped);
-            _mediaPlayer.EndReached += (s, e) => OnPlaybackStateChanged(PlaybackState.Ended);
-            _mediaPlayer.EncounteredError += (s, e) => OnPlaybackStateChanged(PlaybackState.Error);
-            _mediaPlayer.Buffering += (s, e) =>
-            {
-                if (e.Cache < 100f)
-                {
-                    OnPlaybackStateChanged(PlaybackState.Buffering);
-                }
-                else
-                {
-                    OnPlaybackStateChanged(PlaybackState.Playing);
-                }
-            };
+            _mediaPlayer.Playing += (s, e) => _qualitiesNeedRefresh = true;
             _mediaPlayer.ESAdded += (s, e) => 
             {
                 if (e.Type == TrackType.Video)
@@ -195,12 +186,10 @@ namespace CinemaModule.VideoPlayer
 
         #region Playback Control
 
-        public void Play(string url)
+        public void Play(string url, string audioSlaveUrl = null)
         {
             if (string.IsNullOrEmpty(url))
-            {
                 return;
-            }
 
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
@@ -213,49 +202,43 @@ namespace CinemaModule.VideoPlayer
             _currentUrl = url;
             using (var media = new Media(_libVLC, uri))
             {
+                if (!string.IsNullOrEmpty(audioSlaveUrl))
+                    media.AddOption($":input-slave={audioSlaveUrl}");
+
                 _mediaPlayer.Play(media);
             }
         }
 
         public void Pause()
         {
-            if (_mediaPlayer.CanPause)
-            {
-                _mediaPlayer.Pause();
-            }
+            if (IsPlaying)
+                _mediaPlayer.SetPause(true);
         }
 
         public void Resume()
         {
-            if (IsPaused)
-            {
-                _mediaPlayer.Play();
-            }
-        }
-
-        public void Replay()
-        {
-            if (string.IsNullOrEmpty(_currentUrl))
+            if (IsPlaying || IsBuffering)
                 return;
 
-            var url = _currentUrl;
-            Play(url);
+            if (IsPaused)
+            {
+                _mediaPlayer.SetPause(false);
+                return;
+            }
+
+            if (IsEnded && !string.IsNullOrEmpty(_currentUrl))
+            {
+                var url = _currentUrl;
+                Play(url);
+            }
         }
 
         public void TogglePause()
         {
             if (IsPlaying)
-            {
                 Pause();
-            }
-            else if (IsPaused)
-            {
+            else
                 Resume();
-            }
-            else if (IsEnded)
-            {
-                Replay();
-            }
         }
 
         public void Stop()
@@ -412,6 +395,8 @@ namespace CinemaModule.VideoPlayer
                 return;
             }
 
+            SyncPlaybackState();
+
             if (_qualitiesNeedRefresh)
             {
                 _qualitiesNeedRefresh = false;
@@ -465,8 +450,43 @@ namespace CinemaModule.VideoPlayer
             }
         }
 
+        private void SyncPlaybackState()
+        {
+            var actualState = GetActualPlaybackState();
+            if (actualState != _lastReportedState)
+            {
+                OnPlaybackStateChanged(actualState);
+            }
+        }
+
+        private PlaybackState GetActualPlaybackState()
+        {
+            if (_mediaPlayer == null)
+                return PlaybackState.Stopped;
+
+            switch (_mediaPlayer.State)
+            {
+                case VLCState.Playing:
+                    return PlaybackState.Playing;
+                case VLCState.Paused:
+                    return PlaybackState.Paused;
+                case VLCState.Stopped:
+                    return PlaybackState.Stopped;
+                case VLCState.Ended:
+                    return PlaybackState.Ended;
+                case VLCState.Error:
+                    return PlaybackState.Error;
+                case VLCState.Buffering:
+                case VLCState.Opening:
+                    return PlaybackState.Buffering;
+                default:
+                    return _lastReportedState;
+            }
+        }
+
         private void OnPlaybackStateChanged(PlaybackState state)
         {
+            _lastReportedState = state;
             PlaybackStateChanged?.Invoke(this, new PlaybackStateEventArgs(state));
         }
 
