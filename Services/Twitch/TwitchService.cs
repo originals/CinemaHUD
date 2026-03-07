@@ -264,6 +264,11 @@ namespace CinemaModule.Services.Twitch
                 var playlistContent = await _httpClient.GetStringAsync(masterPlaylistUrl);
                 return ParseM3U8Playlist(playlistContent);
             }
+            catch (HttpRequestException ex)
+            {
+                Logger.Warn($"Stream unavailable for channel '{channelName}': {ex.Message}");
+                return new List<TwitchStreamQuality>();
+            }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Failed to get stream qualities for channel: {channelName}");
