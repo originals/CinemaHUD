@@ -45,7 +45,6 @@
 | **Watch Party** | Host synchronized viewing sessions with friends |
 | **Followed Channels** | Link your Twitch account to see your followed live channels |
 | **Custom URLs** | Play any video URL supported by LibVLC |
-| **On-Demand Content** | Play pre-recorded videos and VODs alongside live streams |
 | **Radio Streams** | Play internet radio with live track info display |
 | **On-Screen Display** | Floating window overlay, freely position and resize |
 | **In-Game World Display** | Place 3D video screens at custom locations in the game world |
@@ -146,7 +145,17 @@ Browse and select streams to play.
 |----------|-------------|
 | **Preset Categories** | Pre-configured stream collections (GW2, Music, etc.) |
 | **Followed Channels** | Your followed Twitch channels (requires Twitch login) |
-| **My Streams** | Your saved custom streams |
+| **Custom Categories** | Your saved streams organized into custom categories |
+
+#### Category Management
+
+Create and organize your own stream categories for better organization.
+
+| Action | Description |
+|--------|-------------|
+| **+ Add Category** | Click the button below the category menu to create a new category |
+| **Rename** | Select a custom category, then click the "Rename" button in the toolbar to rename it |
+| **Delete** | Select a custom category, then click the "Delete" button in the toolbar to remove it (requires at least one category to remain) |
 
 #### Stream Types
 
