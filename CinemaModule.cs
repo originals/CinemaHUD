@@ -64,7 +64,7 @@ namespace CinemaModule
 
         #region Properties
 
-        internal const string ModuleVersion = "1.3.0";
+        internal const string ModuleVersion = "2.0.0";
         internal SettingsManager SettingsManager => ModuleParameters.SettingsManager;
         internal ContentsManager ContentsManager => ModuleParameters.ContentsManager;
         internal DirectoriesManager DirectoriesManager => ModuleParameters.DirectoriesManager;

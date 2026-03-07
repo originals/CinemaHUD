@@ -19,6 +19,7 @@ namespace CinemaModule.Services
         private readonly ImageCacheService _imageCache;
         private readonly HttpClient _httpClient;
         private Texture2D _whitePixel;
+        private AsyncTexture2D _fallbackTexture;
         private TwitchStreamInfo _cachedTwitchStreamInfo;
 
         #region Texture Names
@@ -80,34 +81,34 @@ namespace CinemaModule.Services
 
         #region GW2 Asset Textures
 
-        public AsyncTexture2D GetPlayIcon() => AsyncTexture2D.FromAssetId(156998);
-        public AsyncTexture2D GetVolumeNotMutedIcon() => AsyncTexture2D.FromAssetId(156738);
-        public AsyncTexture2D GetVolumeMutedIcon() => AsyncTexture2D.FromAssetId(156739);
-        public AsyncTexture2D GetSettingsIcon() => AsyncTexture2D.FromAssetId(155052);
-        public AsyncTexture2D GetSettingsBackground() => AsyncTexture2D.FromAssetId(965776);
-        public AsyncTexture2D GetTwitchChatIcon() => AsyncTexture2D.FromAssetId(155156);
-        public AsyncTexture2D GetCloseIcon() => AsyncTexture2D.FromAssetId(255443);
-        public AsyncTexture2D GetQualityIcon() => AsyncTexture2D.FromAssetId(440023);
-        public AsyncTexture2D GetVolumeBackground() => AsyncTexture2D.FromAssetId(155208);
+        public AsyncTexture2D GetPlayIcon() => GetAssetTexture(156998);
+        public AsyncTexture2D GetVolumeNotMutedIcon() => GetAssetTexture(156738);
+        public AsyncTexture2D GetVolumeMutedIcon() => GetAssetTexture(156739);
+        public AsyncTexture2D GetSettingsIcon() => GetAssetTexture(155052);
+        public AsyncTexture2D GetSettingsBackground() => GetAssetTexture(965776);
+        public AsyncTexture2D GetTwitchChatIcon() => GetAssetTexture(155156);
+        public AsyncTexture2D GetCloseIcon() => GetAssetTexture(255443);
+        public AsyncTexture2D GetQualityIcon() => GetAssetTexture(440023);
+        public AsyncTexture2D GetVolumeBackground() => GetAssetTexture(155208);
         public AsyncTexture2D GetSeekBarBackground() => GetTexture(SeekBarBackgroundTexture);
-        public AsyncTexture2D GetResizeCorner() => AsyncTexture2D.FromAssetId(156009);
-        public AsyncTexture2D GetResizeCornerActive() => AsyncTexture2D.FromAssetId(156010);
-        public AsyncTexture2D GetLockIcon() => AsyncTexture2D.FromAssetId(733265);
-        public AsyncTexture2D GetLockActiveIcon() => AsyncTexture2D.FromAssetId(733266);
-        public AsyncTexture2D GetDisplayIcon() => AsyncTexture2D.FromAssetId(358406);
-        public AsyncTexture2D GetSourceIcon() => AsyncTexture2D.FromAssetId(156909);
-        public AsyncTexture2D GetCopyIcon() => AsyncTexture2D.FromAssetId(2208347);
-        public AsyncTexture2D GetCardBackground() => AsyncTexture2D.FromAssetId(154960);
-        public AsyncTexture2D GetWindowTexture() => AsyncTexture2D.FromAssetId(155997);
-        public AsyncTexture2D GetSetScreenIcon() => AsyncTexture2D.FromAssetId(528726);
-        public AsyncTexture2D GetWaypointIcon() => AsyncTexture2D.FromAssetId(156628);
-        public AsyncTexture2D GetInfoIcon() => AsyncTexture2D.FromAssetId(1508665);
-        public AsyncTexture2D GetRefreshIcon() => AsyncTexture2D.FromAssetId(156749);
-        public AsyncTexture2D GetWatchPartyIcon() => AsyncTexture2D.FromAssetId(156694);
-        public AsyncTexture2D GetArrowUpIcon() => AsyncTexture2D.FromAssetId(102617);
-        public AsyncTexture2D GetArrowDownIcon() => AsyncTexture2D.FromAssetId(102618);
-        public AsyncTexture2D GetTabbedWindowBackground() => AsyncTexture2D.FromAssetId(155985);
-        public AsyncTexture2D GetMenuItemFade() => AsyncTexture2D.FromAssetId(156044);
+        public AsyncTexture2D GetResizeCorner() => GetAssetTexture(156009);
+        public AsyncTexture2D GetResizeCornerActive() => GetAssetTexture(156010);
+        public AsyncTexture2D GetLockIcon() => GetAssetTexture(733265);
+        public AsyncTexture2D GetLockActiveIcon() => GetAssetTexture(733266);
+        public AsyncTexture2D GetDisplayIcon() => GetAssetTexture(358406);
+        public AsyncTexture2D GetSourceIcon() => GetAssetTexture(156909);
+        public AsyncTexture2D GetCopyIcon() => GetAssetTexture(2208347);
+        public AsyncTexture2D GetCardBackground() => GetAssetTexture(154960);
+        public AsyncTexture2D GetWindowTexture() => GetAssetTexture(155997);
+        public AsyncTexture2D GetSetScreenIcon() => GetAssetTexture(528726);
+        public AsyncTexture2D GetWaypointIcon() => GetAssetTexture(156628);
+        public AsyncTexture2D GetInfoIcon() => GetAssetTexture(1508665);
+        public AsyncTexture2D GetRefreshIcon() => GetAssetTexture(156749);
+        public AsyncTexture2D GetWatchPartyIcon() => GetAssetTexture(156694);
+        public AsyncTexture2D GetArrowUpIcon() => GetAssetTexture(102617);
+        public AsyncTexture2D GetArrowDownIcon() => GetAssetTexture(102618);
+        public AsyncTexture2D GetTabbedWindowBackground() => GetAssetTexture(155985);
+        public AsyncTexture2D GetMenuItemFade() => GetAssetTexture(156044);
 
         #endregion
 
@@ -234,8 +235,18 @@ namespace CinemaModule.Services
         {
             _whitePixel?.Dispose();
             _whitePixel = null;
+            _fallbackTexture = null;
             _imageCache?.Dispose();
             _httpClient?.Dispose();
+        }
+
+        private AsyncTexture2D GetFallbackTexture()
+        {
+            if (_fallbackTexture == null || _fallbackTexture.IsDisposed)
+            {
+                _fallbackTexture = ContentService.Textures.Error;
+            }
+            return _fallbackTexture;
         }
 
         private AsyncTexture2D GetTexture(string textureName)
@@ -247,7 +258,20 @@ namespace CinemaModule.Services
             catch (Exception ex)
             {
                 Logger.Debug($"Failed to load texture '{textureName}': {ex.Message}");
-                return null;
+                return GetFallbackTexture();
+            }
+        }
+
+        private AsyncTexture2D GetAssetTexture(int assetId)
+        {
+            try
+            {
+                return AsyncTexture2D.FromAssetId(assetId);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"Failed to load asset texture '{assetId}': {ex.Message}");
+                return GetFallbackTexture();
             }
         }
     }

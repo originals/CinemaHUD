@@ -30,7 +30,7 @@ namespace CinemaModule.UI.Windows.MainSettings
         private const int StatusSectionHeight = 100;
         private const int DescriptionSectionHeight = 90;
         private const int HelpSectionHeight = 220;
-        private const int CreateRoomSectionHeight = 280;
+        private const int CreatePartySectionHeight = 280;
         private const string NothingPlayingText = "Nothing playing";
         private const string NoDescriptionText = "No description";
 
@@ -51,7 +51,7 @@ namespace CinemaModule.UI.Windows.MainSettings
         private Panel _queueContainer;
         private Panel _hostControlsSection;
         private Panel _statusSection;
-        private Panel _createRoomSection;
+        private Panel _createPartySection;
         private Panel _descriptionSection;
         private Panel _helpSection;
         private Label _descriptionLabel;
@@ -68,10 +68,10 @@ namespace CinemaModule.UI.Windows.MainSettings
         private List<string> _lastMembers = new List<string>();
         private StandardButton _joinRoomButton;
         private StandardButton _leaveRoomButton;
-        private StandardButton _createRoomButton;
+        private StandardButton _createPartyButton;
         private Label _apiWarningLabel;
         private StandardButton _resyncButton;
-        private TextBox _roomNameBox;
+        private TextBox _partyNameBox;
         private WatchPartyRoom _selectedRoom;
         private bool _isViewActive;
 
@@ -136,7 +136,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             BuildDescriptionSection();
             BuildHostControls();
             BuildStatusSection();
-            BuildCreateRoomSection();
+            BuildCreatePartySection();
             BuildHelpSection();
             BuildQueueSection();
         }
@@ -157,11 +157,11 @@ namespace CinemaModule.UI.Windows.MainSettings
 
         private void UpdateLobbyLayout()
         {
-            if (!_createRoomSection.Visible) return;
+            if (!_createPartySection.Visible) return;
 
             int availableHeight = _rightColumn.Height - HelpSectionHeight - 5;
-            int createRoomHeight = Math.Min(CreateRoomSectionHeight, availableHeight);
-            _createRoomSection.Size = new Point(_rightColumn.Width, createRoomHeight);
+            int createPartyHeight = Math.Min(CreatePartySectionHeight, availableHeight);
+            _createPartySection.Size = new Point(_rightColumn.Width, createPartyHeight);
         }
 
         #endregion
@@ -177,19 +177,19 @@ namespace CinemaModule.UI.Windows.MainSettings
                 Location = new Point(LeftColumnWidth - 80, 5),
                 Parent = _leftColumn,
                 Enabled = false,
-                BasicTooltipText = "Join the selected room"
+                BasicTooltipText = "Join the selected party"
             };
 
             _joinRoomButton.Click += (s, e) => JoinSelectedRoom();
 
             _leaveRoomButton = new StandardButton
             {
-                Text = "Leave Room",
+                Text = "Leave Party",
                 Size = new Point(100, 26),
                 Location = new Point(LeftColumnWidth - 110, 5),
                 Parent = _leftColumn,
                 Visible = false,
-                BasicTooltipText = "Leave the current room"
+                BasicTooltipText = "Leave the current party"
             };
 
             _leaveRoomButton.Click += async (s, e) =>
@@ -203,7 +203,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             _browserPanel = new Panel
             {
                 ShowBorder = true,
-                Title = "Rooms",
+                Title = "Parties",
                 Size = new Point(LeftColumnWidth, _leftColumn.Height),
                 Location = new Point(0, 0),
                 Parent = _leftColumn,
@@ -258,12 +258,12 @@ namespace CinemaModule.UI.Windows.MainSettings
 
         private void ShowPasswordPrompt(string roomId)
         {
-            _createRoomSection.Visible = false;
+            _createPartySection.Visible = false;
 
             var prompt = new Panel
             {
                 ShowBorder = true,
-                Title = "Enter Room Password",
+                Title = "Enter Party Password",
                 Size = new Point(_rightColumn.Width, 100),
                 Location = new Point(0, 0),
                 Parent = _rightColumn
@@ -298,13 +298,13 @@ namespace CinemaModule.UI.Windows.MainSettings
                 await _controller.JoinRoomAsync(roomId, pwBox.Text);
                 prompt.Dispose();
                 if (!_controller.IsInRoom)
-                    _createRoomSection.Visible = true;
+                    _createPartySection.Visible = true;
             };
 
             cancelButton.Click += (s, e) =>
             {
                 prompt.Dispose();
-                _createRoomSection.Visible = true;
+                _createPartySection.Visible = true;
             };
         }
 
@@ -383,31 +383,14 @@ namespace CinemaModule.UI.Windows.MainSettings
             var state = _controller.CurrentState;
             string localName = _controller.LocalGw2Name;
             string hostName = _controller.CurrentRoom?.HostUsername;
-            bool isHost = _controller.IsHost;
 
             foreach (var member in members)
             {
-                bool isSelf = member == localName;
                 bool isMemberHost = member == hostName;
                 string displayName = BuildViewerDisplayName(member, isMemberHost);
                 string subtitle = FormatMemberInfo(member, state);
 
-                List<ListCardButton> buttons = null;
-                if (isHost && !isSelf && !isMemberHost)
-                {
-                    buttons = new List<ListCardButton>
-                    {
-                        new ListCardButton
-                        {
-                            Text = "Ban",
-                            Width = 50,
-                            Tooltip = $"Ban {member} from this room",
-                            OnClick = () => _ = _controller.BanMemberAsync(member)
-                        }
-                    };
-                }
-
-                var card = new ListCard(_membersFlow, displayName, subtitle, false, showAvatar: false, buttons: buttons);
+                var card = new ListCard(_membersFlow, displayName, subtitle, false, showAvatar: false);
                 _memberCards[member] = card;
             }
         }
@@ -491,7 +474,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             _descriptionSection = new Panel
             {
                 ShowBorder = true,
-                Title = "Room Description",
+                Title = "Party Description",
                 Size = new Point(_rightColumn.Width, DescriptionSectionHeight),
                 Location = new Point(0, 0),
                 Parent = _rightColumn,
@@ -584,7 +567,7 @@ namespace CinemaModule.UI.Windows.MainSettings
 
             new Label
             {
-                Text = "Limit:",
+                Text = "Queue Limit:",
                 Location = new Point(110, 71),
                 AutoSizeWidth = true,
                 Parent = _hostControlsSection,
@@ -593,8 +576,8 @@ namespace CinemaModule.UI.Windows.MainSettings
 
             _queueLimitDropdown = new Dropdown
             {
-                Size = new Point(90, 25),
-                Location = new Point(150, 67),
+                Size = new Point(100, 25),
+                Location = new Point(195, 67),
                 Parent = _hostControlsSection,
                 BasicTooltipText = "Max videos per user in queue (0 = unlimited)"
             };
@@ -609,7 +592,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             var autoplayCheckbox = new Checkbox
             {
                 Text = "Autoplay next",
-                Location = new Point(250, 71),
+                Location = new Point(310, 71),
                 Checked = _userSettings.WatchPartyAutoplayNext,
                 Parent = _hostControlsSection,
                 BasicTooltipText = "Automatically play the next video when current one ends"
@@ -668,13 +651,13 @@ namespace CinemaModule.UI.Windows.MainSettings
 
         #region Right Column - Create Room
 
-        private void BuildCreateRoomSection()
+        private void BuildCreatePartySection()
         {
-            _createRoomSection = new Panel
+            _createPartySection = new Panel
             {
                 ShowBorder = true,
-                Title = "Create Room",
-                Size = new Point(_rightColumn.Width, CreateRoomSectionHeight),
+                Title = "Create Party",
+                Size = new Point(_rightColumn.Width, CreatePartySectionHeight),
                 Location = new Point(0, HelpSectionHeight + 5),
                 Parent = _rightColumn,
                 Visible = false,
@@ -689,21 +672,21 @@ namespace CinemaModule.UI.Windows.MainSettings
 
             new Label
             {
-                Text = "Room Name:",
+                Text = "Party Name:",
                 Location = new Point(labelX, y + 4),
                 AutoSizeWidth = true,
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
-            _roomNameBox = new TextBox
+            _partyNameBox = new TextBox
             {
                 PlaceholderText = "Movie Night, Chill Stream, etc.",
                 Size = new Point(inputWidth, 30),
                 Location = new Point(inputX, y),
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
-            _roomNameBox.TextChanged += (s, e) => UpdateCreateRoomButtonState();
+            _partyNameBox.TextChanged += (s, e) => UpdateCreatePartyButtonState();
 
             y += 35;
 
@@ -712,7 +695,7 @@ namespace CinemaModule.UI.Windows.MainSettings
                 Text = "Description:",
                 Location = new Point(labelX, y + 4),
                 AutoSizeWidth = true,
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
             var descriptionBox = new MultilineTextBox
@@ -720,7 +703,7 @@ namespace CinemaModule.UI.Windows.MainSettings
                 PlaceholderText = "Meet at Lion's Arch, /sqjoin YourName...",
                 Size = new Point(inputWidth, 50),
                 Location = new Point(inputX, y),
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
             y += 55;
@@ -730,14 +713,14 @@ namespace CinemaModule.UI.Windows.MainSettings
                 Text = "Share Location:",
                 Location = new Point(labelX, y + 4),
                 AutoSizeWidth = true,
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
             var locationDropdown = new Dropdown
             {
                 Size = new Point(inputWidth, 30),
                 Location = new Point(inputX, y),
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
             PopulateLocationDropdown(locationDropdown);
@@ -749,18 +732,18 @@ namespace CinemaModule.UI.Windows.MainSettings
             {
                 Text = "Private (password required)",
                 Location = new Point(labelX, y),
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
             y += 25;
 
             var passwordBox = new TextBox
             {
-                PlaceholderText = "Room password...",
+                PlaceholderText = "Party password...",
                 Size = new Point(inputWidth, 30),
                 Location = new Point(inputX, y),
                 Visible = false,
-                Parent = _createRoomSection
+                Parent = _createPartySection
             };
 
             privateCheckbox.CheckedChanged += (s, e) =>
@@ -776,28 +759,28 @@ namespace CinemaModule.UI.Windows.MainSettings
                 Location = new Point(10, y),
                 AutoSizeWidth = true,
                 TextColor = Microsoft.Xna.Framework.Color.Orange,
-                Parent = _createRoomSection,
+                Parent = _createPartySection,
                 Visible = !_controller.IsApiAvailable
             };
 
-            _createRoomButton = new StandardButton
+            _createPartyButton = new StandardButton
             {
-                Text = "Create Room",
+                Text = "Create Party",
                 Size = new Point(120, 30),
                 Location = new Point(10, y),
-                Parent = _createRoomSection,
+                Parent = _createPartySection,
                 Visible = _controller.IsApiAvailable
             };
 
-            UpdateCreateRoomButtonState();
+            UpdateCreatePartyButtonState();
 
-            _createRoomButton.Click += async (s, e) =>
+            _createPartyButton.Click += async (s, e) =>
             {
-                if (string.IsNullOrWhiteSpace(_roomNameBox.Text))
+                if (string.IsNullOrWhiteSpace(_partyNameBox.Text))
                     return;
 
-                _createRoomButton.Enabled = false;
-                _createRoomButton.Text = "Creating...";
+                _createPartyButton.Enabled = false;
+                _createPartyButton.Text = "Creating...";
 
                 try
                 {
@@ -810,7 +793,7 @@ namespace CinemaModule.UI.Windows.MainSettings
                     }
 
                     var success = await _controller.CreateRoomAsync(
-                        _roomNameBox.Text,
+                        _partyNameBox.Text,
                         privateCheckbox.Checked,
                         passwordBox.Text,
                         sharedLocation);
@@ -818,9 +801,9 @@ namespace CinemaModule.UI.Windows.MainSettings
                     if (success)
                     {
                         if (!string.IsNullOrWhiteSpace(descriptionBox.Text))
-                            await _controller.UpdateRoomAsync(_roomNameBox.Text, descriptionBox.Text);
+                            await _controller.UpdateRoomAsync(_partyNameBox.Text, descriptionBox.Text);
 
-                        _roomNameBox.Text = "";
+                        _partyNameBox.Text = "";
                         descriptionBox.Text = "";
                         passwordBox.Text = "";
                         privateCheckbox.Checked = false;
@@ -829,12 +812,12 @@ namespace CinemaModule.UI.Windows.MainSettings
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Create Room exception");
+                    Logger.Error(ex, "Create Party exception");
                 }
                 finally
                 {
-                    UpdateCreateRoomButtonState();
-                    _createRoomButton.Text = "Create Room";
+                    UpdateCreatePartyButtonState();
+                    _createPartyButton.Text = "Create Party";
                 }
             };
         }
@@ -899,7 +882,7 @@ namespace CinemaModule.UI.Windows.MainSettings
 
             new Label
             {
-                Text = "• Create or join a room to get started",
+                Text = "• Create or join a party to get started",
                 Location = new Point(10, y),
                 AutoSizeWidth = true,
                 Parent = _helpSection
@@ -1152,7 +1135,7 @@ namespace CinemaModule.UI.Windows.MainSettings
         private List<ListCardButton> CreateQueueItemButtons(int index, int queueCount)
         {
             var textureService = CinemaModule.Instance.TextureService;
-            return new List<ListCardButton>
+            var buttons = new List<ListCardButton>
             {
                 new ListCardButton
                 {
@@ -1160,30 +1143,32 @@ namespace CinemaModule.UI.Windows.MainSettings
                     Width = 30,
                     Tooltip = "Remove from Queue",
                     OnClick = () => _ = _controller.RemoveFromQueueAsync(index)
-                },
-                new ListCardButton
+                }
+            };
+
+            if (index < queueCount - 1)
+            {
+                buttons.Add(new ListCardButton
                 {
                     Icon = textureService.GetArrowDownIcon(),
                     Width = 30,
                     Tooltip = "Move Down",
-                    OnClick = () =>
-                    {
-                        if (index < queueCount - 1)
-                            _ = _controller.ReorderQueueAsync(index, index + 1);
-                    }
-                },
-                new ListCardButton
+                    OnClick = () => _ = _controller.ReorderQueueAsync(index, index + 1)
+                });
+            }
+
+            if (index > 0)
+            {
+                buttons.Add(new ListCardButton
                 {
                     Icon = textureService.GetArrowUpIcon(),
                     Width = 30,
                     Tooltip = "Move Up",
-                    OnClick = () =>
-                    {
-                        if (index > 0)
-                            _ = _controller.ReorderQueueAsync(index, index - 1);
-                    }
-                }
-            };
+                    OnClick = () => _ = _controller.ReorderQueueAsync(index, index - 1)
+                });
+            }
+
+            return buttons;
         }
 
         private async Task LoadQueueCardInfoAsync(ListCard card, string videoId, bool titleAlreadyCached)
@@ -1214,7 +1199,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             _hostControlsSection.Visible = false;
             _statusSection.Visible = false;
             _resyncButton.Visible = false;
-            _createRoomSection.Visible = true;
+            _createPartySection.Visible = true;
             _helpSection.Visible = true;
             _descriptionSection.Visible = false;
 
@@ -1229,7 +1214,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             _joinRoomButton.Visible = false;
             _leaveRoomButton.Visible = true;
             _selectedRoom = null;
-            _createRoomSection.Visible = false;
+            _createPartySection.Visible = false;
             _helpSection.Visible = false;
 
             UpdateLeftColumnLayout(true);
@@ -1268,7 +1253,7 @@ namespace CinemaModule.UI.Windows.MainSettings
 
             _playNextButton.Enabled = false;
 
-            _descriptionSection.Title = "Room";
+            _descriptionSection.Title = "Party";
             _descriptionLabel.Text = NoDescriptionText;
             _applyLocationButton.Visible = false;
 
@@ -1290,7 +1275,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             {
                 if (child is Panel p)
                 {
-                    if (p == _hostControlsSection || p == _statusSection || p == _createRoomSection || p == _descriptionSection || p == _helpSection) continue;
+                    if (p == _hostControlsSection || p == _statusSection || p == _createPartySection || p == _descriptionSection || p == _helpSection) continue;
                     p.Visible = visible;
                 }
             }
@@ -1327,7 +1312,7 @@ namespace CinemaModule.UI.Windows.MainSettings
 
         private void UpdateDescription(WatchPartyLocalState state)
         {
-            _descriptionSection.Title = string.IsNullOrEmpty(state.RoomName) ? "Room" : state.RoomName;
+            _descriptionSection.Title = string.IsNullOrEmpty(state.RoomName) ? "Party" : state.RoomName;
             _descriptionLabel.Text = string.IsNullOrEmpty(state.Description) ? NoDescriptionText : state.Description;
             UpdateApplyLocationButton();
         }
@@ -1534,6 +1519,14 @@ namespace CinemaModule.UI.Windows.MainSettings
 
         private void OnMemberBanned(object sender, string username)
         {
+            bool isSelf = string.Equals(username, _controller.LocalGw2Name, StringComparison.OrdinalIgnoreCase);
+            if (isSelf)
+            {
+                ScreenNotification.ShowNotification("You have been kicked from the party.", ScreenNotification.NotificationType.Error);
+                ShowLobbyView();
+                return;
+            }
+
             if (HasMembersChanged(_controller.CurrentState?.Members ?? new List<string>()))
                 PopulateMembers(_controller.CurrentState.Members);
         }
@@ -1541,27 +1534,27 @@ namespace CinemaModule.UI.Windows.MainSettings
         private void OnApiAvailabilityChanged(object sender, EventArgs e)
         {
             bool isAvailable = _controller.IsApiAvailable;
-            _createRoomButton.Visible = isAvailable;
+            _createPartyButton.Visible = isAvailable;
             _apiWarningLabel.Visible = !isAvailable;
-            UpdateCreateRoomButtonState();
+            UpdateCreatePartyButtonState();
 
             if (_selectedRoom != null)
                 _joinRoomButton.Enabled = isAvailable;
         }
 
-        private void UpdateCreateRoomButtonState()
+        private void UpdateCreatePartyButtonState()
         {
-            bool hasRoomName = !string.IsNullOrWhiteSpace(_roomNameBox?.Text);
+            bool hasPartyName = !string.IsNullOrWhiteSpace(_partyNameBox?.Text);
             bool apiAvailable = _controller.IsApiAvailable;
 
-            _createRoomButton.Enabled = hasRoomName && apiAvailable;
+            _createPartyButton.Enabled = hasPartyName && apiAvailable;
 
             if (!apiAvailable)
-                _createRoomButton.BasicTooltipText = "API key with Account permission required";
-            else if (!hasRoomName)
-                _createRoomButton.BasicTooltipText = "Enter a room name to create a room";
+                _createPartyButton.BasicTooltipText = "API key with Account permission required";
+            else if (!hasPartyName)
+                _createPartyButton.BasicTooltipText = "Enter a party name to create a party";
             else
-                _createRoomButton.BasicTooltipText = "Create a new watch party room";
+                _createPartyButton.BasicTooltipText = "Create a new watch party";
         }
 
         private void OnServerStatusChanged(object sender, EventArgs e)

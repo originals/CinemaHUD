@@ -126,10 +126,26 @@ namespace CinemaModule.Controllers.WatchParty
             if (state == null || !state.HasVideo)
             {
                 HandleNoVideo();
+                TryAutoplayFromQueue(state, e.ChangeType);
                 return;
             }
 
             ProcessStateChange(state, e.ChangeType);
+        }
+
+        private void TryAutoplayFromQueue(WatchPartyLocalState state, WatchPartyStateChangeType changeType)
+        {
+            if (!_watchPartyController.IsHost || !_userSettings.WatchPartyAutoplayNext)
+                return;
+
+            if (state == null || state.Queue.Count == 0)
+                return;
+
+            if (changeType != WatchPartyStateChangeType.QueueUpdated)
+                return;
+
+            Logger.Debug("Queue updated with no video playing - triggering autoplay");
+            _ = _watchPartyController.PlayNextInQueueAsync();
         }
 
         private void ProcessStateChange(WatchPartyLocalState state, WatchPartyStateChangeType changeType)

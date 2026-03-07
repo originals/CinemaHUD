@@ -8,13 +8,13 @@
 
 <p align="center">
   <em>
-    A <a href="https://blishhud.com">Blish HUD</a> module for Guild Wars 2 that lets you watch Twitch streams or play any VLC stream directly in-game.
+    A <a href="https://blishhud.com">Blish HUD</a> module for Guild Wars 2 that lets you watch Twitch streams, YouTube videos, or play any VLC stream directly in-game.
   </em>
 </p>
 
 <p align="center">
   Display it on your screen or place video screens in the game world.<br>
-  The perfect way to throw an in-game watch party with your guildmates or friends.
+  Host synchronized watch parties with your guildmates and friends.
 </p>
 
 ---
@@ -25,6 +25,7 @@
 - [Installation](#installation)
 - [Display Modes](#display-modes)
 - [Main Settings Window](#main-settings-window)
+- [Watch Party](#watch-party)
 - [Playback Controls](#playback-controls)
 - [Twitch Chat Window](#twitch-chat-window)
 - [Editor Windows](#editor-windows)
@@ -40,6 +41,8 @@
 | Feature | Description |
 |---------|-------------|
 | **Twitch Integration** | Watch live Twitch streams with quality selection |
+| **YouTube Playback** | Play YouTube videos with full playback control |
+| **Watch Party** | Host synchronized viewing sessions with friends |
 | **Followed Channels** | Link your Twitch account to see your followed live channels |
 | **Custom URLs** | Play any video URL supported by LibVLC |
 | **On-Demand Content** | Play pre-recorded videos and VODs alongside live streams |
@@ -170,6 +173,77 @@ Browse and select streams to play.
 |------|--------|
 | ![Refresh](https://www.gw2opus.com/wp-content/uploads/2026/02/refresh.png) | Refresh category data |
 | ![Add](https://www.gw2opus.com/wp-content/uploads/2026/02/addnew.png) | Add new custom stream |
+
+---
+
+## Watch Party
+
+Host or join synchronized YouTube viewing sessions with other players. All viewers watch the same video at the same time, controlled by the party host.
+
+### Watch Party Tab
+
+Access the Watch Party feature via the third tab in the main settings window.
+
+#### Party Browser (Left Panel)
+
+| Element | Description |
+|---------|-------------|
+| **Parties List** | Browse available public watch parties |
+| **Join Button** | Join the selected party |
+| **Leave Party** | Leave your current party |
+| **Viewers Panel** | Shows all members in your current party with their playback status |
+
+#### Creating a Party
+
+| Field | Description |
+|-------|-------------|
+| **Party Name** | Display name for your party |
+| **Description** | Optional description for your party |
+| **Private** | Enable to require a password for joining |
+| **Password** | Set a password for private parties |
+| **Share Location** | Share your current world screen position with viewers |
+
+#### Host Controls
+
+When hosting a party, you have access to:
+
+| Control | Description |
+|---------|-------------|
+| **Now Playing** | Shows the current video being played |
+| **Play Next** | Skip to the next video in the queue |
+| **Queue Limit** | Set maximum videos each viewer can add to queue |
+| **Video Queue** | Manage the playlist of upcoming videos |
+
+#### Joining a Party
+
+1. Select a party from the parties list
+2. Click "Join" (enter password if required for private parties)
+3. Your video will automatically sync with the host's playback
+
+#### Adding Videos to Queue
+
+| Method | Description |
+|--------|-------------|
+| **YouTube URL** | Paste a YouTube video URL to add it to the queue |
+
+
+#### Viewer Status Icons
+
+| Status | Description |
+|--------|-------------|
+| **Idle** | Not currently playing video |
+| **Buffering** | Video is loading |
+| **Playing** | Video is playing and synced |
+| **Paused** | Playback is paused |
+
+#### Shared Screen Position
+
+Hosts can share their world screen location with all party members. Click the screen position button to apply the host's shared location to your display.
+
+### Requirements
+
+- GW2 API access must be enabled (used for player identification)
+- Internet connection to the Watch Party server
 
 ---
 
@@ -345,6 +419,8 @@ CinemaHUD uses LibVLC for media playback.
 | **Twitch Ads** | Ads will play even if you are subscribed to a channel. CinemaHUD is not a first-party Twitch app, so subscription ad-free benefits do not apply. |
 | **World Screen Occlusion** | In-game world screens render on top of all objects. Players and objects between you and the screen will not occlude it. |
 | **Performance** | Video playback may impact performance on lower-end systems. Reduce stream quality if needed. |
+| **Watch Party YouTube Only** | Watch Party currently only supports YouTube videos. Twitch streams and other sources are not supported in party mode. |
+| **Watch Party Sync** | Minor sync differences may occur due to network latency. Use the resync button if playback drifts significantly. |
 
 ---
 
