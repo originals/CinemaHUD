@@ -1,11 +1,10 @@
 {
   "name": "CinemaHUD",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "namespace": "Originals.GW2.CinnemaHUD",
   "package": "CinemaHUD.dll",
   "manifest_version": 1,
-
-  "description": "Watch Twitch streams or play custom video's in game world or directly on screen.",
+  "description": "Watch Twitch, YouTube, and any VLC-supported URL directly in Guild Wars 2. Display on screen or in the game world, with Watch Party support for synchronized viewing with friends.",
   "dependencies": {
     "bh.blishhud": ">=1.2.0"
   },

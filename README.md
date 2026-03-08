@@ -137,7 +137,7 @@ Configure display mode and manage world screen locations.
 
 Browse and select streams to play.
 
-![Source Tab](https://www.gw2opus.com/wp-content/uploads/2026/02/channelguide.png)
+![Source Tab](https://www.gw2opus.com/wp-content/uploads/2026/03/channelguide.png)
 
 #### Categories Menu
 
@@ -148,6 +148,7 @@ Browse and select streams to play.
 | **Custom Categories** | Your saved streams organized into custom categories |
 
 #### Category Management
+![Category Management](https://www.gw2opus.com/wp-content/uploads/2026/03/categorymanagement.png)
 
 Create and organize your own stream categories for better organization.
 
@@ -189,6 +190,9 @@ Create and organize your own stream categories for better organization.
 
 Host or join synchronized YouTube viewing sessions with other players. All viewers watch the same video at the same time, controlled by the party host.
 
+![Watch Party](https://www.gw2opus.com/wp-content/uploads/2026/03/watchparty.png)
+
+
 ### Watch Party Tab
 
 Access the Watch Party feature via the third tab in the main settings window.
@@ -216,12 +220,15 @@ Access the Watch Party feature via the third tab in the main settings window.
 
 When hosting a party, you have access to:
 
+![Host Controls](https://www.gw2opus.com/wp-content/uploads/2026/03/hostcontrol.png)
+
 | Control | Description |
 |---------|-------------|
 | **Now Playing** | Shows the current video being played |
 | **Play Next** | Skip to the next video in the queue |
 | **Queue Limit** | Set maximum videos each viewer can add to queue |
 | **Video Queue** | Manage the playlist of upcoming videos |
+| **Autoplay next** | Enable or disable automatic playback of the next video in the queue |
 
 #### Joining a Party
 
