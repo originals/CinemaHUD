@@ -200,7 +200,7 @@ namespace CinemaModule.Services.YouTube
                     .ThenByDescending(s => s.Bitrate.BitsPerSecond)
                     .ToList();
 
-                var preferredVideo = videoOnlyStreams.FirstOrDefault(s => s.VideoQuality.MaxHeight == 1080)
+                var preferredVideo = videoOnlyStreams.FirstOrDefault(s => Is1080p(s.VideoQuality.MaxHeight, s.VideoQuality.Label))
                     ?? videoOnlyStreams.FirstOrDefault();
 
                 if (preferredVideo != null)
@@ -215,7 +215,7 @@ namespace CinemaModule.Services.YouTube
                     .OrderByDescending(s => s.VideoQuality.MaxHeight)
                     .ToList();
 
-                var preferredMuxed = muxedStreams.FirstOrDefault(s => s.VideoQuality.MaxHeight == 1080)
+                var preferredMuxed = muxedStreams.FirstOrDefault(s => Is1080p(s.VideoQuality.MaxHeight, s.VideoQuality.Label))
                     ?? muxedStreams.FirstOrDefault();
 
                 return new YouTubeStreamUrls(preferredMuxed?.Url);
@@ -364,11 +364,22 @@ namespace CinemaModule.Services.YouTube
 
         private static int FindPreferredQualityIndex(List<YouTubeStreamQuality> qualities)
         {
-            int index1080 = qualities.FindIndex(q => q.Height == 1080);
+            int index1080 = qualities.FindIndex(q => Is1080p(q.Height, q.DisplayName));
             if (index1080 >= 0)
                 return index1080;
 
             return 0;
+        }
+
+        private static bool Is1080p(int height, string displayName)
+        {
+            if (height >= 1070 && height <= 1090)
+                return true;
+
+            if (!string.IsNullOrEmpty(displayName) && displayName.Contains("1080"))
+                return true;
+
+            return false;
         }
 
         public YouTubeStreamQuality SelectQuality(int qualityIndex)
