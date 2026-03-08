@@ -42,10 +42,17 @@ namespace CinemaModule.Settings
         #region Members (Runtime Only)
 
         private StreamPresetData _currentStreamPreset;
+        private string _audioUrl;
 
         #endregion
 
         #region Properties
+
+        public string AudioUrl
+        {
+            get => _audioUrl;
+            set => _audioUrl = value;
+        }
 
         public StreamPresetData CurrentStreamPreset
         {

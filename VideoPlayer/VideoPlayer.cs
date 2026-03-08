@@ -10,7 +10,7 @@ namespace CinemaModule.VideoPlayer
     public class VideoPlayerOptions
     {
         public bool EnableHardwareAcceleration { get; set; } = true;
-        public int NetworkCachingMs { get; set; } = 1000;
+        public int NetworkCachingMs { get; set; } = 2000;
         public int MaxWidth { get; set; } = 1920;
         public int MaxHeight { get; set; } = 1080;
         public int PreferredResolution { get; set; } = 1080;
@@ -34,6 +34,8 @@ namespace CinemaModule.VideoPlayer
         private Texture2D _videoTexture;
         private bool _isDisposed;
         private string _currentUrl;
+        private string _currentAudioSlaveUrl;
+        private bool _hasAudioSlave;
         private List<VideoQuality> _availableQualities = new List<VideoQuality>();
         private int _selectedQualityIndex = -1;
         private volatile bool _qualitiesNeedRefresh;
@@ -87,10 +89,39 @@ namespace CinemaModule.VideoPlayer
             get => _mediaPlayer?.Position ?? 0f;
             set
             {
-                if (_mediaPlayer != null)
+                if (_mediaPlayer == null)
+                    return;
+
+                float clampedPosition = Math.Max(0f, Math.Min(1f, value));
+                long length = _mediaPlayer.Length;
+
+                if (length > 0 && _hasAudioSlave)
                 {
-                    _mediaPlayer.Position = Math.Max(0f, Math.Min(1f, value));
+                    PerformAudioSlaveSeek(clampedPosition, length);
                 }
+                else
+                {
+                    _mediaPlayer.Position = clampedPosition;
+                }
+            }
+        }
+
+        private void PerformAudioSlaveSeek(float targetPosition, long length)
+        {
+            bool wasPlaying = IsPlaying;
+            long targetTimeMs = (long)(targetPosition * length);
+
+            _mediaPlayer.SetPause(true);
+            _mediaPlayer.Time = targetTimeMs;
+
+            if (wasPlaying)
+            {
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    await System.Threading.Tasks.Task.Delay(100);
+                    if (!_isDisposed && _mediaPlayer != null)
+                        _mediaPlayer.SetPause(false);
+                });
             }
         }
 
@@ -142,7 +173,10 @@ namespace CinemaModule.VideoPlayer
                 "--adaptive-logic=highest",
                 $"--adaptive-maxwidth={options.MaxWidth}",
                 $"--adaptive-maxheight={options.MaxHeight}",
-                $"--preferred-resolution={options.PreferredResolution}"
+                $"--preferred-resolution={options.PreferredResolution}",
+                "--clock-jitter=0",
+                "--avcodec-skip-frame=0",
+                "--avcodec-skip-idct=0"
             };
 
             if (options.EnableHardwareAcceleration)
@@ -200,10 +234,15 @@ namespace CinemaModule.VideoPlayer
             Stop();
 
             _currentUrl = url;
+            _currentAudioSlaveUrl = audioSlaveUrl;
+            _hasAudioSlave = !string.IsNullOrEmpty(audioSlaveUrl);
             using (var media = new Media(_libVLC, uri))
             {
-                if (!string.IsNullOrEmpty(audioSlaveUrl))
+                if (_hasAudioSlave)
+                {
                     media.AddOption($":input-slave={audioSlaveUrl}");
+                    media.AddOption(":clock-synchro=0");
+                }
 
                 _mediaPlayer.Play(media);
             }
@@ -228,8 +267,7 @@ namespace CinemaModule.VideoPlayer
 
             if (IsEnded && !string.IsNullOrEmpty(_currentUrl))
             {
-                var url = _currentUrl;
-                Play(url);
+                Play(_currentUrl, _currentAudioSlaveUrl);
             }
         }
 
@@ -248,6 +286,8 @@ namespace CinemaModule.VideoPlayer
             _videoTexture?.Dispose();
             _videoTexture = null;
             _currentUrl = null;
+            _currentAudioSlaveUrl = null;
+            _hasAudioSlave = false;
             _availableQualities.Clear();
             _selectedQualityIndex = -1;
         }

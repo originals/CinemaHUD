@@ -2,6 +2,13 @@
 
 All notable changes to CinemaHUD will be documented in this file.
 
+## [2.0.1]
+
+### Bugfix
+- Youtube videos now load in 1080p when available
+- Category selection in channel guide was not remembered correctly
+- Improved seeking for youtube videos
+
 
 ## [2.0.0]
 

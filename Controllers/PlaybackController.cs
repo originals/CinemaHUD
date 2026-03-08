@@ -123,6 +123,8 @@ namespace CinemaModule.Controllers
 
         public void Play(string url) => _videoPlayer?.Play(url);
 
+        public void Play(string url, string audioUrl) => _videoPlayer?.Play(url, audioUrl);
+
         public void Stop() => _videoPlayer?.Stop();
 
         public void TogglePause() => _videoPlayer?.TogglePause();
@@ -169,7 +171,8 @@ namespace CinemaModule.Controllers
             _youtubeService.ClearCachedQualities();
 
             _videoPlayer.Stop();
-            _videoPlayer.Play(url);
+            _videoPlayer.Play(url, _userSettings.AudioUrl);
+            _userSettings.AudioUrl = null;
 
             FetchQualitiesForCurrentSource();
         }
@@ -265,9 +268,19 @@ namespace CinemaModule.Controllers
             try
             {
                 videoInfo = videoInfo ?? await _youtubeService.GetVideoInfoAsync(videoId);
-                var freshUrl = videoInfo?.IsLiveStream == true
-                    ? await _youtubeService.GetLiveStreamUrlAsync(videoId)
-                    : await _youtubeService.GetPlayableStreamUrlAsync(videoId);
+                string freshUrl;
+                string audioUrl = null;
+
+                if (videoInfo?.IsLiveStream == true)
+                {
+                    freshUrl = await _youtubeService.GetLiveStreamUrlAsync(videoId);
+                }
+                else
+                {
+                    var streamUrls = await _youtubeService.GetBestQualityStreamUrlsAsync(videoId);
+                    freshUrl = streamUrls.VideoUrl;
+                    audioUrl = streamUrls.AudioUrl;
+                }
 
                 if (string.IsNullOrEmpty(freshUrl))
                 {
@@ -275,7 +288,7 @@ namespace CinemaModule.Controllers
                     return;
                 }
 
-                PlayYouTubeStream(freshUrl, videoId, autoplay);
+                PlayYouTubeStream(freshUrl, audioUrl, videoId, autoplay);
                 YouTubeStreamUrlRefreshed?.Invoke(this, new YouTubeStreamRefreshedEventArgs(videoId, freshUrl));
             }
             catch (Exception ex)
@@ -290,19 +303,19 @@ namespace CinemaModule.Controllers
 
         private void PlayTwitchStream(string streamUrl, string channelName, bool autoplay = true)
         {
-            PlayAndPauseIfNeeded(streamUrl, autoplay);
+            PlayAndPauseIfNeeded(streamUrl, null, autoplay);
             _twitchService.FetchAndCacheQualitiesAsync(channelName);
         }
 
-        private void PlayYouTubeStream(string streamUrl, string videoId, bool autoplay = true)
+        private void PlayYouTubeStream(string streamUrl, string audioUrl, string videoId, bool autoplay = true)
         {
-            PlayAndPauseIfNeeded(streamUrl, autoplay);
+            PlayAndPauseIfNeeded(streamUrl, audioUrl, autoplay);
             _ = _youtubeService.FetchAndCacheQualitiesAsync(videoId);
         }
 
-        private void PlayAndPauseIfNeeded(string url, bool autoplay)
+        private void PlayAndPauseIfNeeded(string url, string audioUrl, bool autoplay)
         {
-            _videoPlayer.Play(url);
+            _videoPlayer.Play(url, audioUrl);
             if (!autoplay)
                 _videoPlayer.Pause();
         }

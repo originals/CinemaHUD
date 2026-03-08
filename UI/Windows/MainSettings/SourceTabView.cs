@@ -247,9 +247,19 @@ namespace CinemaModule.UI.Windows.MainSettings
         private void SelectInitialCategory()
         {
             string initialCategory = DetermineInitialCategory();
-            var menuItem = _categoryMenu.Children
-                .OfType<MenuItem>()
-                .FirstOrDefault(m => m.Text == initialCategory);
+            MenuItem menuItem;
+
+            if (initialCategory.StartsWith(KeyPrefixCustomTab))
+            {
+                string tabId = initialCategory.Substring(KeyPrefixCustomTab.Length);
+                _customTabMenuItems.TryGetValue(tabId, out menuItem);
+            }
+            else
+            {
+                menuItem = _categoryMenu.Children
+                    .OfType<MenuItem>()
+                    .FirstOrDefault(m => m.Text == initialCategory);
+            }
 
             if (menuItem != null)
                 _categoryMenu.Select(menuItem);
@@ -1048,23 +1058,15 @@ namespace CinemaModule.UI.Windows.MainSettings
             _controller.PrepareForStreamChange();
             UpdateCardSelection();
 
-            Func<Task<string>> getUrlFunc = null;
-            string description = null;
-
             switch (stream.SourceType)
             {
                 case StreamSourceType.TwitchChannel:
-                    getUrlFunc = () => _twitchService.GetPlayableStreamUrlAsync(stream.Value);
-                    description = $"stream: {stream.Name}";
+                    await TrySetStreamUrlAsync(() => _twitchService.GetPlayableStreamUrlAsync(stream.Value), $"stream: {stream.Name}", _selectionCts.Token);
                     break;
                 case StreamSourceType.YouTubeVideo:
-                    getUrlFunc = () => _youtubeService.GetBestStreamUrlAsync(stream.Value);
-                    description = $"YouTube video: {stream.Name}";
+                    await TrySetYouTubeStreamUrlAsync(stream.Value, $"YouTube video: {stream.Name}", _selectionCts.Token);
                     break;
             }
-
-            if (getUrlFunc != null)
-                await TrySetStreamUrlAsync(getUrlFunc, description, _selectionCts.Token);
         }
 
         private void CancelPendingSelection()
@@ -1081,6 +1083,23 @@ namespace CinemaModule.UI.Windows.MainSettings
                 var url = await getUrlAsync();
                 if (token.IsCancellationRequested) return;
                 _settings.StreamUrl = url ?? "";
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                if (!token.IsCancellationRequested)
+                    Logger.Error(ex, $"Failed to get stream URL for {streamDescription}");
+            }
+        }
+
+        private async Task TrySetYouTubeStreamUrlAsync(string videoIdOrUrl, string streamDescription, CancellationToken token)
+        {
+            try
+            {
+                var urls = await _youtubeService.GetBestStreamUrlsAsync(videoIdOrUrl);
+                if (token.IsCancellationRequested) return;
+                _settings.AudioUrl = urls.AudioUrl;
+                _settings.StreamUrl = urls.VideoUrl ?? "";
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)

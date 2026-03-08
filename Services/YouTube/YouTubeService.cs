@@ -42,6 +42,19 @@ namespace CinemaModule.Services.YouTube
         }
     }
 
+    public readonly struct YouTubeStreamUrls
+    {
+        public string VideoUrl { get; }
+        public string AudioUrl { get; }
+        public bool HasSeparateAudio => !string.IsNullOrEmpty(AudioUrl);
+
+        public YouTubeStreamUrls(string videoUrl, string audioUrl = null)
+        {
+            VideoUrl = videoUrl;
+            AudioUrl = audioUrl;
+        }
+    }
+
     public class YouTubeService : IDisposable
     {
         private static readonly Logger Logger = Logger.GetLogger<YouTubeService>();
@@ -168,29 +181,49 @@ namespace CinemaModule.Services.YouTube
 
         public async Task<string> GetPlayableStreamUrlAsync(string videoIdOrUrl)
         {
+            var result = await GetBestQualityStreamUrlsAsync(videoIdOrUrl).ConfigureAwait(false);
+            return result.VideoUrl;
+        }
+
+        public async Task<YouTubeStreamUrls> GetBestQualityStreamUrlsAsync(string videoIdOrUrl)
+        {
             if (_isDisposed || string.IsNullOrWhiteSpace(videoIdOrUrl))
-                return null;
+                return default;
 
             try
             {
                 var videoId = ExtractVideoId(videoIdOrUrl) ?? videoIdOrUrl;
                 var streamManifest = await _youtubeClient.Videos.Streams.GetManifestAsync(videoId).ConfigureAwait(false);
 
-                var muxedStream = streamManifest.GetMuxedStreams()
+                var videoOnlyStreams = streamManifest.GetVideoOnlyStreams()
                     .OrderByDescending(s => s.VideoQuality.MaxHeight)
-                    .FirstOrDefault();
+                    .ThenByDescending(s => s.Bitrate.BitsPerSecond)
+                    .ToList();
 
-                if (muxedStream != null)
-                    return muxedStream.Url;
+                var preferredVideo = videoOnlyStreams.FirstOrDefault(s => s.VideoQuality.MaxHeight == 1080)
+                    ?? videoOnlyStreams.FirstOrDefault();
 
-                return streamManifest.GetVideoStreams()
+                if (preferredVideo != null)
+                {
+                    var bestAudio = streamManifest.GetAudioOnlyStreams()
+                        .OrderByDescending(a => a.Bitrate.BitsPerSecond)
+                        .FirstOrDefault();
+                    return new YouTubeStreamUrls(preferredVideo.Url, bestAudio?.Url);
+                }
+
+                var muxedStreams = streamManifest.GetMuxedStreams()
                     .OrderByDescending(s => s.VideoQuality.MaxHeight)
-                    .FirstOrDefault()?.Url;
+                    .ToList();
+
+                var preferredMuxed = muxedStreams.FirstOrDefault(s => s.VideoQuality.MaxHeight == 1080)
+                    ?? muxedStreams.FirstOrDefault();
+
+                return new YouTubeStreamUrls(preferredMuxed?.Url);
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, $"Failed to get playable stream URL for: {videoIdOrUrl}");
-                return null;
+                return default;
             }
         }
 
@@ -211,20 +244,30 @@ namespace CinemaModule.Services.YouTube
             }
         }
 
-        public async Task<string> GetBestStreamUrlAsync(string videoIdOrUrl)
+        public async Task<YouTubeStreamUrls> GetBestStreamUrlsAsync(string videoIdOrUrl)
         {
             if (_isDisposed || string.IsNullOrWhiteSpace(videoIdOrUrl))
-                return null;
+                return default;
 
             var videoInfo = await GetVideoInfoAsync(videoIdOrUrl).ConfigureAwait(false);
             if (videoInfo?.IsLiveStream == true)
-                return await GetLiveStreamUrlAsync(videoIdOrUrl).ConfigureAwait(false);
+            {
+                var liveUrl = await GetLiveStreamUrlAsync(videoIdOrUrl).ConfigureAwait(false);
+                return new YouTubeStreamUrls(liveUrl);
+            }
 
-            var url = await GetPlayableStreamUrlAsync(videoIdOrUrl).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(url))
-                return url;
+            var streamUrls = await GetBestQualityStreamUrlsAsync(videoIdOrUrl).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(streamUrls.VideoUrl))
+                return streamUrls;
 
-            return await GetLiveStreamUrlAsync(videoIdOrUrl).ConfigureAwait(false);
+            var fallbackUrl = await GetLiveStreamUrlAsync(videoIdOrUrl).ConfigureAwait(false);
+            return new YouTubeStreamUrls(fallbackUrl);
+        }
+
+        public async Task<string> GetBestStreamUrlAsync(string videoIdOrUrl)
+        {
+            var result = await GetBestStreamUrlsAsync(videoIdOrUrl).ConfigureAwait(false);
+            return result.VideoUrl;
         }
 
         public async Task<List<YouTubeStreamQuality>> GetStreamQualitiesAsync(string videoIdOrUrl)
@@ -302,7 +345,7 @@ namespace CinemaModule.Services.YouTube
                 lock (_qualitiesLock)
                 {
                     _cachedQualities = qualities;
-                    _selectedQualityIndex = 0;
+                    _selectedQualityIndex = FindPreferredQualityIndex(qualities);
                     qualityNames = _cachedQualities.Select(q => q.DisplayName).ToList();
                     selectedIndex = _selectedQualityIndex;
                 }
@@ -317,6 +360,15 @@ namespace CinemaModule.Services.YouTube
             {
                 Interlocked.Exchange(ref _isFetchingQualities, 0);
             }
+        }
+
+        private static int FindPreferredQualityIndex(List<YouTubeStreamQuality> qualities)
+        {
+            int index1080 = qualities.FindIndex(q => q.Height == 1080);
+            if (index1080 >= 0)
+                return index1080;
+
+            return 0;
         }
 
         public YouTubeStreamQuality SelectQuality(int qualityIndex)
