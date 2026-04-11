@@ -84,6 +84,9 @@ namespace CinemaModule.UI.Windows.MainSettings
         public bool IsOnDemand { get; set; }
         public int ViewerCount { get; set; }
         public int Index { get; set; }
+        public bool IsPlaylistVideo { get; set; }
+        public string PlaylistTitle { get; set; }
+        public string PlaylistVideoId { get; set; }
 
         public void ApplyStatus(StreamStatus status)
         {
@@ -147,6 +150,15 @@ namespace CinemaModule.UI.Windows.MainSettings
             return card;
         }
 
+        public ListCard CreatePlaylistVideoCard(FlowPanel parent, StreamListItem item, Action<string, string> onSelect)
+        {
+            var buttons = CreatePlaylistVideoButtons(item.PlaylistVideoId);
+            var status = new StreamStatus { Subtitle = item.Subtitle, SubtitleColor = item.SubtitleColor };
+            var card = CreateCard(parent, item.Key, item.Title, status, buttons, item.AvatarTexture);
+            card.Click += (s, e) => onSelect(item.PlaylistVideoId, item.Key);
+            return card;
+        }
+
         public ListCard CreateCustomCard(FlowPanel parent, string key, SavedStream stream, StreamStatus status,
             Action onDelete, Action onEdit, Action<SavedStream> onSelect)
         {
@@ -198,6 +210,17 @@ namespace CinemaModule.UI.Windows.MainSettings
                 buttons.Add(CreateIconButton(_textureService.GetWaypointIcon(), "Copy waypoint to clipboard", () => OnCopyWaypoint?.Invoke(channel.Waypoint)));
             if (channel?.HasWorldPosition == true)
                 buttons.Add(CreateIconButton(_textureService.GetSetScreenIcon(), "Apply in-game screen position", () => OnApplyWorldPosition?.Invoke(channel)));
+            return buttons;
+        }
+
+        private List<ListCardButton> CreatePlaylistVideoButtons(string videoId)
+        {
+            var buttons = new List<ListCardButton>();
+            if (!string.IsNullOrEmpty(videoId))
+            {
+                var youtubeUrl = $"https://www.youtube.com/watch?v={videoId}";
+                buttons.Add(CreateIconButton(_textureService.GetYoutubeIcon(), "Watch on YouTube", () => OpenUrl(youtubeUrl)));
+            }
             return buttons;
         }
 
@@ -296,12 +319,14 @@ namespace CinemaModule.UI.Windows.MainSettings
             var statusMap = new Dictionary<string, StreamStatus>();
             var twitchStreams = streams.Where(s => s.SourceType == StreamSourceType.TwitchChannel).ToList();
             var urlStreams = streams.Where(s => s.SourceType == StreamSourceType.Url).ToList();
-            var youtubeStreams = streams.Where(s => s.SourceType == StreamSourceType.YouTubeVideo).ToList();
+            var youtubeVideoStreams = streams.Where(s => s.SourceType == StreamSourceType.YouTubeVideo).ToList();
+            var youtubeChannelOrPlaylistStreams = streams.Where(s => s.IsYouTubeChannelOrPlaylist).ToList();
 
             await Task.WhenAll(
                 FetchTwitchCustomStatusesAsync(twitchStreams, statusMap, token),
                 FetchUrlCustomStatusesAsync(urlStreams, statusMap, token),
-                FetchYouTubeCustomStatusesAsync(youtubeStreams, statusMap, token));
+                FetchYouTubeCustomStatusesAsync(youtubeVideoStreams, statusMap, token),
+                FetchYouTubeChannelPlaylistStatusesAsync(youtubeChannelOrPlaylistStreams, statusMap, token));
             return statusMap;
         }
 
@@ -400,6 +425,48 @@ namespace CinemaModule.UI.Windows.MainSettings
                     if (token.IsCancellationRequested) return;
                     Logger.Debug($"Failed to check URL status for {stream.Name}: {ex.Message}");
                     statusMap[stream.Id] = new StreamStatus { Subtitle = "Unknown" };
+                }
+            });
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task FetchYouTubeChannelPlaylistStatusesAsync(List<SavedStream> streams,
+            Dictionary<string, StreamStatus> statusMap, CancellationToken token)
+        {
+            if (streams.Count == 0) return;
+
+            var tasks = streams.Select(async stream =>
+            {
+                try
+                {
+                    var videos = await _youtubeService.GetChannelVideosAsync(stream.Value, 1);
+                    if (token.IsCancellationRequested) return;
+
+                    if (videos.Count > 0)
+                    {
+                        statusMap[stream.Id] = new StreamStatus
+                        {
+                            Subtitle = "Click to browse videos",
+                            SubtitleColor = Color.LightGreen
+                        };
+                    }
+                    else
+                    {
+                        statusMap[stream.Id] = new StreamStatus
+                        {
+                            Subtitle = "No videos found",
+                            SubtitleColor = Color.Gray
+                        };
+                    }
+                }
+                catch
+                {
+                    if (token.IsCancellationRequested) return;
+                    statusMap[stream.Id] = new StreamStatus
+                    {
+                        Subtitle = "Could not load",
+                        SubtitleColor = Color.Gray
+                    };
                 }
             });
             await Task.WhenAll(tasks);

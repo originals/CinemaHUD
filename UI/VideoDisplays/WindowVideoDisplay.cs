@@ -253,11 +253,11 @@ namespace CinemaModule.UI.VideoDisplays
 
             if (IsOffline && OfflineTexture != null && !OfflineTexture.IsDisposed)
             {
-                DrawOfflineTexture(spriteBatch, videoRect);
+                DrawTexturePreservingAspectRatio(spriteBatch, OfflineTexture, videoRect);
             }
             else if (_currentTexture != null && !_currentTexture.IsDisposed)
             {
-                spriteBatch.Draw(_currentTexture, videoRect, Color.White);
+                DrawTexturePreservingAspectRatio(spriteBatch, _currentTexture, videoRect);
             }
 
             if (!string.IsNullOrEmpty(RadioTrackName))
@@ -272,9 +272,9 @@ namespace CinemaModule.UI.VideoDisplays
             _controlsOverlay.Draw(spriteBatch);
         }
 
-        private void DrawOfflineTexture(SpriteBatch spriteBatch, Rectangle videoRect)
+        private void DrawTexturePreservingAspectRatio(SpriteBatch spriteBatch, Texture2D texture, Rectangle videoRect)
         {
-            float textureAspect = (float)OfflineTexture.Width / OfflineTexture.Height;
+            float textureAspect = (float)texture.Width / texture.Height;
             float targetAspect = (float)videoRect.Width / videoRect.Height;
 
             Rectangle destRect;
@@ -297,7 +297,7 @@ namespace CinemaModule.UI.VideoDisplays
                     videoRect.Height);
             }
 
-            spriteBatch.Draw(OfflineTexture, destRect, Color.White);
+            spriteBatch.Draw(texture, destRect, Color.White);
         }
 
         private void DrawBorder(SpriteBatch spriteBatch, Rectangle panelRect, Color baseColor)

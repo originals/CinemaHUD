@@ -18,10 +18,14 @@ namespace CinemaModule.UI.Windows.Dialogs
             "• Live streams: M3U8, HLS, RTSP, RTMP\n" +
             "• Radio/Audio: MP3, AAC, OGG streams\n" +
             "• Local files: file:///C:/path/to/video.mp4";
-        private const string YouTubeHelpText = "Supported formats:\n" +
+        private const string YouTubeVideoHelpText = "Supported formats:\n" +
             "• Full URL: https://www.youtube.com/watch?v=VIDEO_ID\n" +
             "• Short URL: https://youtu.be/VIDEO_ID\n" +
             "• Video ID: VIDEO_ID";
+        private const string YouTubePlaylistHelpText = "Supported formats:\n" +
+            "• Playlist URL: https://www.youtube.com/playlist?list=PLxxxxxxxx\n" +
+            "• Playlist ID: PLxxxxxxxx\n" +
+            "• Channel ID: UCxxxxxxxx (shows latest uploads)";
 
         private readonly CinemaUserSettings _settings;
         private readonly TextureService _textureService;
@@ -32,8 +36,9 @@ namespace CinemaModule.UI.Windows.Dialogs
 
         private TextBox _nameTextBox;
         private GlowButton _twitchButton;
-        private GlowButton _youtubeButton;
         private GlowButton _urlButton;
+        private GlowButton _youtubeVideoButton;
+        private GlowButton _youtubePlaylistButton;
         private TextBox _valueTextBox;
         private Label _valueLabel;
         private Label _helpLabel;
@@ -110,9 +115,10 @@ namespace CinemaModule.UI.Windows.Dialogs
                 Parent = parent
             };
 
-            _twitchButton = CreateSourceButton(buttonPanel, _textureService.GetTwitchIcon(), "Twitch", StreamSourceType.TwitchChannel);
-            _youtubeButton = CreateSourceButton(buttonPanel, _textureService.GetYoutubeIcon(), "YouTube", StreamSourceType.YouTubeVideo);
+            _twitchButton = CreateSourceButton(buttonPanel, _textureService.GetTwitchIcon(), "Twitch Channel", StreamSourceType.TwitchChannel);
             _urlButton = CreateSourceButton(buttonPanel, _textureService.GetVlcIcon(), "URL", StreamSourceType.Url);
+            _youtubeVideoButton = CreateSourceButton(buttonPanel, _textureService.GetYoutubeIcon(), "YouTube Video", StreamSourceType.YouTubeVideo);
+            _youtubePlaylistButton = CreateSourceButton(buttonPanel, _textureService.GetYoutubeIcon(), "YouTube Playlist", StreamSourceType.YouTubePlaylist);
         }
 
         private GlowButton CreateSourceButton(Container parent, Blish_HUD.Content.AsyncTexture2D icon, string tooltip, StreamSourceType sourceType)
@@ -133,8 +139,9 @@ namespace CinemaModule.UI.Windows.Dialogs
         {
             _selectedSourceType = sourceType;
             _twitchButton.Checked = sourceType == StreamSourceType.TwitchChannel;
-            _youtubeButton.Checked = sourceType == StreamSourceType.YouTubeVideo;
             _urlButton.Checked = sourceType == StreamSourceType.Url;
+            _youtubeVideoButton.Checked = sourceType == StreamSourceType.YouTubeVideo;
+            _youtubePlaylistButton.Checked = sourceType == StreamSourceType.YouTubePlaylist;
             OnSourceTypeChanged();
         }
 
@@ -170,8 +177,8 @@ namespace CinemaModule.UI.Windows.Dialogs
         {
             var buttonPanel = new FlowPanel
             {
-                FlowDirection = ControlFlowDirection.LeftToRight,
-                WidthSizingMode = SizingMode.Fill,
+                FlowDirection = ControlFlowDirection.SingleLeftToRight,
+                WidthSizingMode = SizingMode.AutoSize,
                 HeightSizingMode = SizingMode.AutoSize,
                 ControlPadding = new Vector2(10, 0),
                 Parent = parent
@@ -215,7 +222,12 @@ namespace CinemaModule.UI.Windows.Dialogs
                 case StreamSourceType.YouTubeVideo:
                     _valueLabel.Text = "YouTube URL or Video ID";
                     _valueTextBox.PlaceholderText = "YouTube URL or video ID";
-                    _helpLabel.Text = YouTubeHelpText;
+                    _helpLabel.Text = YouTubeVideoHelpText;
+                    break;
+                case StreamSourceType.YouTubePlaylist:
+                    _valueLabel.Text = "YouTube Playlist";
+                    _valueTextBox.PlaceholderText = "Playlist URL or ID";
+                    _helpLabel.Text = YouTubePlaylistHelpText;
                     break;
                 default:
                     _valueLabel.Text = "URL";

@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
 using YoutubeExplode;
+using YoutubeExplode.Channels;
+using YoutubeExplode.Common;
+using YoutubeExplode.Playlists;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 
@@ -28,6 +32,15 @@ namespace CinemaModule.Services.YouTube
         public string ThumbnailUrl { get; set; }
         public TimeSpan Duration { get; set; }
         public bool IsLiveStream { get; set; }
+    }
+
+    public class YouTubePlaylistVideo
+    {
+        public string VideoId { get; set; }
+        public string Title { get; set; }
+        public string Author { get; set; }
+        public string ThumbnailUrl { get; set; }
+        public TimeSpan Duration { get; set; }
     }
 
     public class YouTubeQualitiesEventArgs : EventArgs
@@ -415,6 +428,106 @@ namespace CinemaModule.Services.YouTube
         {
             _videoInfoCache.Clear();
             _videoInfoCacheOrder.Clear();
+        }
+
+        public async Task<List<YouTubePlaylistVideo>> GetChannelVideosAsync(string channelIdOrPlaylistUrl, int maxCount)
+        {
+            if (_isDisposed || string.IsNullOrWhiteSpace(channelIdOrPlaylistUrl) || maxCount <= 0)
+                return new List<YouTubePlaylistVideo>();
+
+            try
+            {
+                var input = channelIdOrPlaylistUrl.Trim();
+
+                if (IsChannelId(input))
+                    return await GetChannelUploadsAsync(input, maxCount).ConfigureAwait(false);
+
+                if (input.StartsWith("@"))
+                    return await GetChannelUploadsAsync(input, maxCount).ConfigureAwait(false);
+
+                var playlistId = PlaylistId.TryParse(input);
+                if (playlistId != null)
+                    return await GetPlaylistVideosAsync(playlistId.Value, maxCount).ConfigureAwait(false);
+
+                return await GetChannelUploadsAsync(input, maxCount).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Failed to get videos for: {channelIdOrPlaylistUrl} - {ex.Message}");
+                return new List<YouTubePlaylistVideo>();
+            }
+        }
+
+        private static bool IsChannelId(string input)
+        {
+            return input.StartsWith("UC") && input.Length == 24 && !input.Contains("/");
+        }
+
+        private async Task<List<YouTubePlaylistVideo>> GetChannelUploadsAsync(string channelIdOrHandle, int maxCount)
+        {
+            if (IsChannelId(channelIdOrHandle))
+            {
+                var uploadsPlaylistId = "UU" + channelIdOrHandle.Substring(2);
+                return await GetPlaylistVideosAsync(uploadsPlaylistId, maxCount).ConfigureAwait(false);
+            }
+
+            var channel = await ResolveChannelAsync(channelIdOrHandle).ConfigureAwait(false);
+            if (channel == null)
+                return new List<YouTubePlaylistVideo>();
+
+            var uploadsId = "UU" + channel.Id.Value.Substring(2);
+            return await GetPlaylistVideosAsync(uploadsId, maxCount).ConfigureAwait(false);
+        }
+
+        private async Task<Channel> ResolveChannelAsync(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return null;
+
+            var cleanInput = input.Trim();
+
+            try
+            {
+                if (cleanInput.StartsWith("@"))
+                    return await _youtubeClient.Channels.GetByHandleAsync(cleanInput.Substring(1)).ConfigureAwait(false);
+
+                var channelId = ChannelId.TryParse(cleanInput);
+                if (channelId != null)
+                    return await _youtubeClient.Channels.GetAsync(channelId.Value).ConfigureAwait(false);
+
+                var handleMatch = Regex.Match(cleanInput, @"youtube\.com/@([^/?]+)");
+                if (handleMatch.Success)
+                    return await _youtubeClient.Channels.GetByHandleAsync(handleMatch.Groups[1].Value).ConfigureAwait(false);
+
+                var userMatch = Regex.Match(cleanInput, @"youtube\.com/user/([^/?]+)");
+                if (userMatch.Success)
+                    return await _youtubeClient.Channels.GetByUserAsync(userMatch.Groups[1].Value).ConfigureAwait(false);
+
+                var slugMatch = Regex.Match(cleanInput, @"youtube\.com/c/([^/?]+)");
+                if (slugMatch.Success)
+                    return await _youtubeClient.Channels.GetBySlugAsync(slugMatch.Groups[1].Value).ConfigureAwait(false);
+
+                return await _youtubeClient.Channels.GetByHandleAsync(cleanInput).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Could not resolve channel '{input}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<List<YouTubePlaylistVideo>> GetPlaylistVideosAsync(string playlistId, int maxCount)
+        {
+            var videos = await _youtubeClient.Playlists.GetVideosAsync(playlistId).CollectAsync(maxCount).ConfigureAwait(false);
+
+            return videos.Select(video => new YouTubePlaylistVideo
+            {
+                VideoId = video.Id.Value,
+                Title = video.Title ?? "Unknown",
+                Author = video.Author?.ChannelTitle ?? "Unknown",
+                ThumbnailUrl = video.Thumbnails?.OrderByDescending(t => t.Resolution.Area).FirstOrDefault()?.Url,
+                Duration = video.Duration ?? TimeSpan.Zero
+            }).ToList();
         }
 
         public void Dispose()

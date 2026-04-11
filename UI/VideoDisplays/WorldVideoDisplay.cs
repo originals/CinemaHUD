@@ -17,12 +17,12 @@ namespace CinemaModule.UI.VideoDisplays
         #region Fields
 
         private const float MinVisibleDistance = 0.001f;
-            private const float ForwardDotThreshold = 0.01f;
-            private const int MinVisibleWidth = 8;
-            private const int MinVisibleHeight = 4;
-            private const float BehindCameraThreshold = -5000f;
-            private const float MinAreaThreshold = 10f;
-            private const float CrossProductEpsilon = 0.001f;
+        private const float ForwardDotThreshold = 0.01f;
+        private const int MinVisibleWidth = 8;
+        private const int MinVisibleHeight = 4;
+        private const float BehindCameraThreshold = -5000f;
+        private const float MinAreaThreshold = 10f;
+        private const float CrossProductEpsilon = 0.001f;
 
         private Texture2D _videoTexture;
         private WorldPosition3D _worldPosition;

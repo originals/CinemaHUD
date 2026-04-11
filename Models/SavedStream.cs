@@ -9,7 +9,9 @@ namespace CinemaModule.Models
     {
         Url,
         TwitchChannel,
-        YouTubeVideo
+        YouTubeVideo,
+        YouTubeChannel,
+        YouTubePlaylist
     }
 
     public class SavedStream
@@ -44,6 +46,9 @@ namespace CinemaModule.Models
             Value = value;
             TabId = tabId;
         }
+
+        [JsonIgnore]
+        public bool IsYouTubeChannelOrPlaylist => SourceType == StreamSourceType.YouTubeChannel || SourceType == StreamSourceType.YouTubePlaylist;
     }
 
     public class CustomStreamTab

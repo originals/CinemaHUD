@@ -2,6 +2,12 @@
 
 All notable changes to CinemaHUD will be documented in this file.
 
+## [2.1.0]
+
+### Added
+- Youtube playlist support
+
+
 ## [2.0.1]
 
 ### Bugfix
