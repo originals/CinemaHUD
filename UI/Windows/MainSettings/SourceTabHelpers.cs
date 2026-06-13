@@ -309,7 +309,7 @@ namespace CinemaModule.UI.Windows.MainSettings
             catch (Exception ex)
             {
                 if (!token.IsCancellationRequested)
-                    Logger.Debug($"Failed to fetch Twitch statuses for channel items: {ex.Message}");
+                    Logger.Warn($"Failed to fetch Twitch statuses for channel items: {ex.Message}");
             }
         }
 
@@ -349,10 +349,9 @@ namespace CinemaModule.UI.Windows.MainSettings
                 if (token.IsCancellationRequested) return;
                 item.ApplyStatus(GetUrlStatus(result.IsAvailable == true, item.IsOnDemand));
             }
-            catch (Exception ex)
+            catch
             {
                 if (token.IsCancellationRequested) return;
-                Logger.Debug($"Failed to check URL status: {ex.Message}");
                 item.ApplyStatus(StreamStatus.Offline());
             }
         }
@@ -377,10 +376,8 @@ namespace CinemaModule.UI.Windows.MainSettings
                 foreach (var stream in twitchStreams)
                     statusMap[stream.Id] = CreateTwitchStatus(infos, stream.Value);
             }
-            catch (Exception ex)
+            catch
             {
-                if (!token.IsCancellationRequested)
-                    Logger.Debug($"Failed to fetch Twitch statuses for custom streams: {ex.Message}");
             }
         }
 
@@ -397,10 +394,9 @@ namespace CinemaModule.UI.Windows.MainSettings
                     if (token.IsCancellationRequested) return;
                     statusMap[stream.Id] = info != null ? StreamStatus.YouTubeAvailable(info.Title) : StreamStatus.YouTubeInvalid();
                 }
-                catch (Exception ex)
+                catch
                 {
                     if (token.IsCancellationRequested) return;
-                    Logger.Debug($"Failed to check YouTube status for {stream.Name}: {ex.Message}");
                     statusMap[stream.Id] = StreamStatus.YouTubeInvalid();
                 }
             });
@@ -420,10 +416,9 @@ namespace CinemaModule.UI.Windows.MainSettings
                     if (token.IsCancellationRequested) return;
                     statusMap[stream.Id] = GetUrlStatus(result.IsAvailable == true, false);
                 }
-                catch (Exception ex)
+                catch
                 {
                     if (token.IsCancellationRequested) return;
-                    Logger.Debug($"Failed to check URL status for {stream.Name}: {ex.Message}");
                     statusMap[stream.Id] = new StreamStatus { Subtitle = "Unknown" };
                 }
             });

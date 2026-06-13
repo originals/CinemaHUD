@@ -54,6 +54,7 @@ namespace CinemaModule
         private TextureService _textureService;
         private WatchPartyController _watchPartyController;
         private CornerIcon _cornerIcon;
+        private KeybindHandler _keybindHandler;
         private bool _needsVideoPlayerInit;
         private bool _needsTwitchChatRestore;
         private bool _needsWindowDisplayRestore;
@@ -93,6 +94,7 @@ namespace CinemaModule
             return new ModuleSettingsView(
                 SettingsManager.ModuleSettings,
                 _userSettings,
+                _cinemaSettings,
                 _twitchAuthService,
                 () => _cinemaSettings?.ShowThirdPartyNotices());
         }
@@ -134,6 +136,13 @@ namespace CinemaModule
                     _controller.ShowChatRequested += OnShowChatRequested;
                     _controller.ToggleChatRequested += OnToggleChatRequested;
                     _controller.RegisterWatchParty(_watchPartyController);
+
+                _keybindHandler = new KeybindHandler(
+                    _cinemaSettings,
+                    () => _controller.TogglePause(),
+                    () => _controller.ToggleLockWindow(),
+                    () => _controller.ToggleMute(),
+                    () => _controller.ToggleModuleEnabled());
 
                 CreateCornerIcon();
                 CreateSettingsWindow();
@@ -241,6 +250,7 @@ namespace CinemaModule
             SafeUnsubscribe(() => _controller.ChatChannelChangeRequested -= OnChatChannelChangeRequested);
 
             SafeDispose(_controller);
+            SafeDispose(_keybindHandler);
             SafeDispose(_cornerIcon);
             SafeDispose(_settingsWindow);
             SafeDispose(_twitchChatWindow);

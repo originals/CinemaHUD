@@ -1,5 +1,7 @@
+using Blish_HUD;
 using Blish_HUD.Controls;
 using Blish_HUD.Graphics.UI;
+using Blish_HUD.Input;
 using Blish_HUD.Settings;
 using CinemaModule.UI.Windows.Dialogs;
 using CinemaModule.Services.Twitch;
@@ -18,22 +20,27 @@ namespace CinemaModule.UI.Views
 
         private readonly SettingCollection _settings;
         private readonly CinemaUserSettings _userSettings;
+        private readonly CinemaSettings _cinemaSettings;
         private readonly TwitchAuthService _twitchAuthService;
         private readonly Action _showThirdPartyNoticesAction;
 
         private FlowPanel _settingsPanel;
         private StandardButton _twitchButton;
         private StandardButton _thirdPartyNoticesButton;
+        private Checkbox _foregroundCheckbox;
+        private Checkbox _keybindsEnabledCheckbox;
         private TwitchAuthWindow _twitchAuthWindow;
 
         public ModuleSettingsView(
             SettingCollection settings,
             CinemaUserSettings userSettings,
+            CinemaSettings cinemaSettings,
             TwitchAuthService twitchAuthService,
             Action showThirdPartyNoticesAction)
         {
             _settings = settings;
             _userSettings = userSettings;
+            _cinemaSettings = cinemaSettings;
             _twitchAuthService = twitchAuthService;
             _showThirdPartyNoticesAction = showThirdPartyNoticesAction;
         }
@@ -53,6 +60,7 @@ namespace CinemaModule.UI.Views
             };
 
             BuildSettingsEntries();
+            BuildExtraSettings();
             BuildButtons();
 
             _twitchAuthService.AuthStatusChanged += OnTwitchAuthStatusChanged;
@@ -78,6 +86,61 @@ namespace CinemaModule.UI.Views
 
                 container.Show(settingView);
             }
+        }
+
+        private void BuildExtraSettings()
+        {
+            _foregroundCheckbox = new Checkbox
+            {
+                Text = "Window Display in Foreground",
+                BasicTooltipText = "When enabled, the on-screen window renders on top of all other overlay elements",
+                Checked = _userSettings.WindowInForeground,
+                Parent = _settingsPanel
+            };
+
+            _foregroundCheckbox.CheckedChanged += (s, e) =>
+            {
+                _userSettings.WindowInForeground = _foregroundCheckbox.Checked;
+            };
+
+            BuildKeybindSection();
+        }
+
+        private void BuildKeybindSection()
+        {
+            _keybindsEnabledCheckbox = new Checkbox
+            {
+                Text = "Enable Keybinds",
+                BasicTooltipText = "Master toggle — enables or disables all CinemaHUD keybinds",
+                Checked = _cinemaSettings.KeybindsEnabled.Value,
+                Parent = _settingsPanel
+            };
+
+            _keybindsEnabledCheckbox.CheckedChanged += (s, e) =>
+            {
+                _cinemaSettings.KeybindsEnabled.Value = _keybindsEnabledCheckbox.Checked;
+            };
+
+            AddKeybindRow(_cinemaSettings.KeybindPlayPause);
+            AddKeybindRow(_cinemaSettings.KeybindLockWindow);
+            AddKeybindRow(_cinemaSettings.KeybindMuteToggle);
+            AddKeybindRow(_cinemaSettings.KeybindToggleEnabled);
+        }
+
+        private void AddKeybindRow(SettingEntry<KeyBinding> keybindSetting)
+        {
+            var settingView = Blish_HUD.Settings.UI.Views.SettingView.FromType(keybindSetting, _settingsPanel.Width);
+            if (settingView == null)
+                return;
+
+            var container = new ViewContainer
+            {
+                WidthSizingMode = SizingMode.Fill,
+                HeightSizingMode = SizingMode.AutoSize,
+                Parent = _settingsPanel
+            };
+
+            container.Show(settingView);
         }
 
         private void BuildButtons()

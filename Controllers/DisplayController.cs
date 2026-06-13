@@ -276,6 +276,17 @@ namespace CinemaModule.Controllers
             ForEachDisplay(d => d.RadioTrackName = trackName);
         }
 
+        public void UpdateWindowZIndex(bool inForeground)
+        {
+            _windowDisplay?.ApplyZIndex(inForeground);
+        }
+
+        public void UpdateWindowLockState(bool locked)
+        {
+            if (_windowDisplay != null)
+                _windowDisplay.IsLocked = locked;
+        }
+
         public void ClearVideoTexture()
         {
             ForEachDisplay(d => d.UpdateTexture(null));

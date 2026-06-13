@@ -24,6 +24,8 @@ namespace CinemaModule.UI.VideoDisplays
         private const float AspectRatio = 16f / 9f;
         private const int ResizeCornerSize = 128;
         private const int TopMargin = 35;
+        private const int ZIndexBackground = -9001;
+        private const int ZIndexForeground = 9001;
 
         private Texture2D _currentTexture;
         private WindowVideoControls _controlsOverlay;
@@ -180,7 +182,7 @@ namespace CinemaModule.UI.VideoDisplays
             ShowBorder = false;
             Size = new Point(800, 450);
             Location = new Point(100, 50);
-            ZIndex = -9001;
+            ZIndex = ZIndexBackground;
 
             _renderer = new VideoControlsRenderer(CinemaModule.Instance.TextureService);
             _controlsOverlay = new WindowVideoControls(this);
@@ -198,6 +200,10 @@ namespace CinemaModule.UI.VideoDisplays
 
         #region Public Methods
 
+        public void ApplyZIndex(bool inForeground)
+        {
+            ZIndex = inForeground ? ZIndexForeground : ZIndexBackground;
+        }
         public void UpdateTexture(Texture2D texture)
         {
             if (texture == _currentTexture)
