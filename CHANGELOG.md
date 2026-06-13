@@ -2,6 +2,17 @@
 
 All notable changes to CinemaHUD will be documented in this file.
 
+## [2.1.1]
+
+### Added
+- Keybinds for play/pause, lock/unlock window, mute toggle, and toggle module on/off
+- Master toggle to enable or disable all keybinds
+- Setting to display the on-screen window in foreground or background
+
+### Updated
+- Third-party dependencies updated to latest versions
+
+
 ## [2.1.0]
 
 ### Added

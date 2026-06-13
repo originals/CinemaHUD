@@ -221,8 +221,6 @@ namespace CinemaModule.UI.Windows.Dialogs
 
         private void OnAuthStatusChanged(object sender, TwitchAuthStatusEventArgs e)
         {
-            Logger.Debug($"Auth status changed: {e.Status} - {e.Message}");
-
             switch (e.Status)
             {
                 case TwitchAuthStatus.Authenticated:

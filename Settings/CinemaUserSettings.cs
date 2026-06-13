@@ -36,6 +36,7 @@ namespace CinemaModule.Settings
         public event EventHandler<string> CurrentYouTubeVideoChanged;
         public event EventHandler SavedLocationsChanged;
         public event EventHandler SavedStreamsChanged;
+        public event EventHandler<bool> WindowInForegroundChanged;
 
         #endregion
 
@@ -163,6 +164,12 @@ namespace CinemaModule.Settings
         {
             get => _data.WindowLocked;
             set => SetProperty(_data.WindowLocked, value, v => _data.WindowLocked = v);
+        }
+
+        public bool WindowInForeground
+        {
+            get => _data.WindowInForeground;
+            set => SetPropertyWithEvent(_data.WindowInForeground, value, v => _data.WindowInForeground = v, WindowInForegroundChanged);
         }
 
         public SavedLocationCollection SavedLocations => _data.SavedLocations;
@@ -545,6 +552,7 @@ namespace CinemaModule.Settings
         public Point WindowPosition { get; set; } = new Point(100, 50);
         public Point WindowSize { get; set; } = new Point(640, 360);
         public bool WindowLocked { get; set; }
+        public bool WindowInForeground { get; set; }
         public SavedLocationCollection SavedLocations { get; set; } = new SavedLocationCollection();
         public SavedStreamCollection SavedStreams { get; set; } = new SavedStreamCollection();
         public string TwitchAccessToken { get; set; }

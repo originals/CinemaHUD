@@ -49,10 +49,8 @@ namespace CinemaModule.VideoPlayer
                 _rawBuffer = newBuffer;
                 _bufferHandle = newHandle;
                 _bufferPtr = newPtr;
-                _textureBuffer = null; // Clear texture buffer to force recreation with new size
+                _textureBuffer = null;
                 _isAllocated = true;
-                
-                Logger.Debug($"Buffer allocated: {size} bytes, ptr={newPtr}");
             }
         }
 

@@ -594,9 +594,8 @@ namespace CinemaModule.UI.Windows.MainSettings
                 ClipboardUtil.WindowsClipboardService.SetTextAsync(waypoint);
                 ScreenNotification.ShowNotification("Waypoint copied!", ScreenNotification.NotificationType.Info);
             }
-            catch (Exception ex)
+            catch
             {
-                Logger.Debug($"Failed to copy waypoint to clipboard: {ex.Message}");
             }
         }
 
@@ -629,27 +628,19 @@ namespace CinemaModule.UI.Windows.MainSettings
             try
             {
                 if (!System.Windows.Forms.Clipboard.ContainsText())
-                {
-                    Logger.Debug("Clipboard does not contain text for import");
                     return;
-                }
 
                 var json = System.Windows.Forms.Clipboard.GetText();
                 var importData = JsonConvert.DeserializeObject<SavedLocationExport>(json);
 
                 if (importData?.Position == null)
-                {
-                    Logger.Debug("Invalid location data in clipboard");
                     return;
-                }
 
                 var name = string.IsNullOrWhiteSpace(importData.Name) ? "Imported Location" : importData.Name;
                 _settings.AddSavedLocation(name, importData.Position, importData.ScreenWidth);
-                Logger.Debug($"Imported location '{name}' from clipboard");
             }
-            catch (Exception ex)
+            catch
             {
-                Logger.Debug($"Failed to import location from clipboard: {ex.Message}");
             }
         }
 
@@ -671,11 +662,9 @@ namespace CinemaModule.UI.Windows.MainSettings
 
                 var json = JsonConvert.SerializeObject(exportData, Formatting.Indented);
                 System.Windows.Forms.Clipboard.SetText(json);
-                Logger.Debug($"Exported location '{name}' to clipboard");
             }
-            catch (Exception ex)
+            catch
             {
-                Logger.Debug($"Failed to export location to clipboard: {ex.Message}");
             }
         }
 
